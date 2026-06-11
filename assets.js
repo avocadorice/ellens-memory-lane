@@ -1095,7 +1095,7 @@ const Assets = {
         break;
 
       case 10: // Mt Fuji and Cherry Blossom
-        this.drawFuji(ctx, stageX, 0, 380, 240);
+        this.drawFuji(ctx, stageX, 0, 560, 310);
         // Cherry blossoms branch framing the view
         this.drawCherryBranch(ctx, stageX - 120, -180, time);
         break;
@@ -1273,56 +1273,81 @@ const Assets = {
     ctx.translate(x, y);
 
     const halfW = width / 2;
-    const topW = 34; // Symmetrical flat top width
+    const topW = width * 0.07; // Dynamic narrow top crater rim (~7%)
 
-    // Gradient for mountain body (misty dark violet to warm sunset pink at base)
+    // 1. Draw the Majestic Rising Sun (red-orange sun of Japan) behind Mt. Fuji
+    const sunRadius = height * 0.45;
+    const sunGrad = ctx.createRadialGradient(
+      0, -height * 0.5, sunRadius * 0.1,
+      0, -height * 0.5, sunRadius
+    );
+    sunGrad.addColorStop(0, '#ff4b4b'); // Intense crimson center
+    sunGrad.addColorStop(0.3, '#ff6b3d'); // Warm orange mid-glow
+    sunGrad.addColorStop(1, 'rgba(254, 180, 123, 0)'); // Fades into sky
+    ctx.fillStyle = sunGrad;
+    ctx.beginPath();
+    ctx.arc(0, -height * 0.5, sunRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Soft sun rays / halo ring
+    ctx.strokeStyle = 'rgba(255, 230, 200, 0.15)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, -height * 0.5, sunRadius * 1.15, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 2. Mountain Body (concave sweeping curves)
     const mountainGrad = ctx.createLinearGradient(0, -height, 0, 0);
-    mountainGrad.addColorStop(0, '#261c38'); // Deep midnight purple peak
-    mountainGrad.addColorStop(0.3, '#3a2d59'); // Indigo
-    mountainGrad.addColorStop(0.65, '#6a4369'); // Rich lavender
-    mountainGrad.addColorStop(1, '#be7b8c'); // Peach sunrise base
+    mountainGrad.addColorStop(0, '#1c142c'); // Dark, majestic volcanic purple-blue peak
+    mountainGrad.addColorStop(0.4, '#2d1e3d');
+    mountainGrad.addColorStop(0.75, '#513354'); // Dark lavender
+    mountainGrad.addColorStop(1, '#985e72'); // Warm sunset base
 
     ctx.fillStyle = mountainGrad;
     ctx.beginPath();
     ctx.moveTo(-halfW, 0);
-    // Iconic sweeping slope curves
-    ctx.bezierCurveTo(-halfW * 0.38, -15, -topW * 2.3, -height * 0.95, -topW, -height);
+    // Exponential sweeping curve: starts flat at base, sweeps up near the top
+    ctx.bezierCurveTo(-halfW * 0.45, 0, -topW * 1.8, -height * 0.85, -topW, -height);
     ctx.lineTo(topW, -height);
-    ctx.bezierCurveTo(topW * 2.3, -height * 0.95, halfW * 0.38, -15, halfW, 0);
+    ctx.bezierCurveTo(topW * 1.8, -height * 0.85, halfW * 0.45, 0, halfW, 0);
     ctx.closePath();
     ctx.fill();
 
-    // Snow cap (White with soft sunrise reflections and shadows)
+    // 3. Snow Cap (White shroud draping elegantly down the peak)
     const snowGrad = ctx.createLinearGradient(0, -height, 0, -height * 0.5);
     snowGrad.addColorStop(0, '#ffffff');
-    snowGrad.addColorStop(0.55, '#f5f7fa');
-    snowGrad.addColorStop(0.85, '#cfd7e6'); // blue shadows
-    snowGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    snowGrad.addColorStop(0.4, '#fafcff');
+    snowGrad.addColorStop(0.7, '#d5e1f2'); // Soft sky-blue shadow
+    snowGrad.addColorStop(1, 'rgba(213, 225, 242, 0)'); // Fades into mountain base
 
     ctx.fillStyle = snowGrad;
     ctx.beginPath();
     
-    const snowSlopeY = -height * 0.58;
-    ctx.moveTo(-topW * 1.82, snowSlopeY);
-    ctx.bezierCurveTo(-topW * 1.5, -height * 0.88, -topW, -height, -topW, -height);
+    // Starting point on the left slope of the snow cap
+    const leftSlopeX = -topW * 1.75;
+    const leftSlopeY = -height * 0.65;
+    ctx.moveTo(leftSlopeX, leftSlopeY);
+    ctx.bezierCurveTo(-topW * 1.3, -height * 0.85, -topW, -height, -topW, -height);
     ctx.lineTo(topW, -height);
-    ctx.bezierCurveTo(topW, -height, topW * 1.5, -height * 0.88, topW * 1.82, snowSlopeY);
+    ctx.bezierCurveTo(topW, -height, topW * 1.3, -height * 0.85, topW * 1.75, leftSlopeY);
     
-    // Symmetrical jagged ridges for the snow's lower edge
-    ctx.lineTo(topW * 1.35, -height * 0.64);
-    ctx.lineTo(topW * 0.92, -height * 0.56);
-    ctx.lineTo(topW * 0.65, -height * 0.66);
-    ctx.lineTo(0, -height * 0.60);
-    ctx.lineTo(-topW * 0.65, -height * 0.66);
-    ctx.lineTo(-topW * 0.92, -height * 0.56);
-    ctx.lineTo(-topW * 1.35, -height * 0.64);
+    // Jagged, elegant snow fingers/ridges wrapping around valleys
+    ctx.lineTo(topW * 1.45, -height * 0.72);
+    ctx.lineTo(topW * 1.05, -height * 0.62);
+    ctx.lineTo(topW * 0.75, -height * 0.76);
+    ctx.lineTo(topW * 0.35, -height * 0.60);
+    ctx.lineTo(0, -height * 0.74);
+    ctx.lineTo(-topW * 0.35, -height * 0.60);
+    ctx.lineTo(-topW * 0.75, -height * 0.76);
+    ctx.lineTo(-topW * 1.05, -height * 0.62);
+    ctx.lineTo(-topW * 1.45, -height * 0.72);
     
     ctx.closePath();
     ctx.fill();
 
-    // Snow ridge lines / shading
-    ctx.strokeStyle = '#bac7db';
-    ctx.lineWidth = 2.2;
+    // 4. Detailed Crevices & Shadows in the Snow (gives it 3D definition)
+    ctx.strokeStyle = 'rgba(150, 175, 210, 0.5)'; // Soft blue shadow lines
+    ctx.lineWidth = 1.8;
     ctx.lineCap = 'round';
     
     const drawCrevice = (sx, sy, ex, ey) => {
@@ -1332,28 +1357,31 @@ const Assets = {
       ctx.stroke();
     };
     
-    drawCrevice(-topW * 0.25, -height * 0.92, -topW * 0.35, -height * 0.76);
-    drawCrevice(topW * 0.15, -height * 0.94, topW * 0.25, -height * 0.74);
-    drawCrevice(-topW * 0.7, -height * 0.89, -topW * 0.95, -height * 0.70);
-    drawCrevice(topW * 0.6, -height * 0.90, topW * 0.85, -height * 0.72);
+    // Snow crevices mapping
+    drawCrevice(-topW * 0.2, -height * 0.93, -topW * 0.3, -height * 0.78);
+    drawCrevice(topW * 0.15, -height * 0.95, topW * 0.25, -height * 0.76);
+    drawCrevice(-topW * 0.6, -height * 0.90, -topW * 0.85, -height * 0.72);
+    drawCrevice(topW * 0.55, -height * 0.91, topW * 0.75, -height * 0.74);
+    drawCrevice(-topW * 1.1, -height * 0.84, -topW * 1.3, -height * 0.68);
+    drawCrevice(topW * 1.1, -height * 0.84, topW * 1.3, -height * 0.68);
 
-    // Layered cloud/mist belts across the center of Mt. Fuji (gives a sense of height)
-    const cloudGrad = ctx.createLinearGradient(0, -height * 0.45, 0, -height * 0.28);
-    cloudGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-    cloudGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = cloudGrad;
-    
+    // 5. Layered Mist / Clouds wrapping the base (enhances height & mood)
     const drawMistCloud = (cx, cy, cw, ch) => {
+      const mistGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cw);
+      mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+      mistGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.15)');
+      mistGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = mistGrad;
       ctx.beginPath();
-      ctx.ellipse(cx, cy, cw, ch, 0, 0, Math.PI*2);
+      ctx.ellipse(cx, cy, cw, ch, 0, 0, Math.PI * 2);
       ctx.fill();
     };
 
-    drawMistCloud(-130, -height * 0.38, 105, 18);
-    drawMistCloud(140, -height * 0.39, 115, 20);
-    drawMistCloud(0, -height * 0.34, 170, 24);
-    drawMistCloud(-220, -height * 0.28, 90, 15);
-    drawMistCloud(220, -height * 0.26, 90, 15);
+    drawMistCloud(-halfW * 0.5, -height * 0.32, width * 0.3, height * 0.08);
+    drawMistCloud(halfW * 0.5, -height * 0.35, width * 0.32, height * 0.09);
+    drawMistCloud(0, -height * 0.28, width * 0.45, height * 0.11);
+    drawMistCloud(-halfW * 0.8, -height * 0.2, width * 0.25, height * 0.06);
+    drawMistCloud(halfW * 0.8, -height * 0.18, width * 0.25, height * 0.06);
 
     ctx.restore();
   },
