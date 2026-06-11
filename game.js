@@ -274,8 +274,8 @@ const Game = {
     this.canvas.style.width = `${targetWidth}px`;
     this.canvas.style.height = `${targetHeight}px`;
     
-    // Handle High DPI
-    const dpr = window.devicePixelRatio || 1;
+    // Handle High DPI (cap at 1.25 on TVs/4K displays to avoid rendering lag)
+    const dpr = Math.min(1.25, window.devicePixelRatio || 1);
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
     this.ctx.scale(dpr, dpr);
@@ -1028,8 +1028,8 @@ const Game = {
     this.ctx.fillStyle = lvlIdx >= 7 ? '#0b1626' : (lvlIdx >= 4 ? '#2b442b' : '#32531d');
     this.ctx.beginPath();
     this.ctx.moveTo(0, this.height - 80);
-    // Draw 3 rolling waves
-    for (let x = 0; x <= this.width; x += 10) {
+    // Draw 3 rolling waves (optimized loop step)
+    for (let x = 0; x <= this.width; x += 30) {
       const scrollPos = x + camX * 0.15;
       const y = this.height - 110 + Math.sin(scrollPos * 0.005) * 20 + Math.cos(scrollPos * 0.01) * 8;
       this.ctx.lineTo(x, y);
@@ -1042,7 +1042,8 @@ const Game = {
     this.ctx.fillStyle = lvlIdx >= 7 ? '#122538' : (lvlIdx >= 4 ? '#385838' : '#47752b');
     this.ctx.beginPath();
     this.ctx.moveTo(0, this.height - 80);
-    for (let x = 0; x <= this.width; x += 10) {
+    // Optimized loop step
+    for (let x = 0; x <= this.width; x += 30) {
       const scrollPos = x + camX * 0.3;
       const y = this.height - 95 + Math.sin(scrollPos * 0.008) * 12 + Math.cos(scrollPos * 0.015) * 5;
       this.ctx.lineTo(x, y);
