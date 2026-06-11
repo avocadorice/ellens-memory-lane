@@ -520,23 +520,6 @@ const Game = {
     handleTouchStart(leftBtn, 'ArrowLeft');
     handleTouchStart(rightBtn, 'ArrowRight');
     handleTouchStart(jumpBtn, 'KeyW');
-
-    // Gift box reveal shaking & clicking
-    const giftBox = document.getElementById('gift-box');
-    giftBox.addEventListener('click', () => {
-      if (giftBox.classList.contains('closed')) {
-        giftBox.classList.remove('closed');
-        giftBox.classList.remove('shaking');
-        giftBox.classList.add('open');
-        AudioEngine.playWinSFX();
-        
-        // Show gift card details
-        setTimeout(() => {
-          document.getElementById('gift-content').classList.remove('hidden');
-          document.getElementById('gift-content').classList.add('visible');
-        }, 800);
-      }
-    });
   },
 
   startGame() {
@@ -555,14 +538,6 @@ const Game = {
     this.isPaused = false;
     this.isRunning = true;
     this.isQuizCompleted = false;
-
-    // Reset UI sections
-    document.getElementById('gift-section').classList.add('active');
-    document.getElementById('gift-content').classList.add('hidden');
-    document.getElementById('gift-content').classList.remove('visible');
-    
-    const giftBox = document.getElementById('gift-box');
-    giftBox.className = 'gift-box closed shaking';
 
     this.setupWorld();
     this.loop();

@@ -78,38 +78,23 @@
       </div>
     </div>
 
-    <!-- UI Overlay: Ending Screen & Gift Unlock -->
+    <!-- UI Overlay: Ending Screen -->
     <div id="ending-screen" class="overlay">
-      <div class="glass-panel ending-panel">
+      <div class="glass-panel ending-panel" style="text-align: center;">
         <div class="fireworks-container" id="fireworks"></div>
         <h1 class="congrats-title">Happy Birthday, Ellen! 🎂</h1>
-        <p class="congrats-subtitle">You completed the journey to Mt. Fuji! But there is one last surprise...</p>
-
-        <!-- The Gift Box Reveal -->
-        <div id="gift-section" class="ending-section active">
-          <h3>Your Birthday Gift! 🎁</h3>
-          <p class="gift-intro">You've unlocked the secret treasure. Click the box to open it!</p>
-          
-          <div class="gift-box-wrapper">
-            <div id="gift-box" class="gift-box closed shaking">
-              <div class="gift-lid"></div>
-              <div class="gift-ribbon"></div>
-              <div class="gift-body"></div>
-            </div>
-          </div>
-
-          <div id="gift-content" class="gift-content hidden">
-            <h2>✨ Special Gift Ticket ✨</h2>
-            <div class="gift-card">
-              <div class="gift-title">A Family Getaway to Mt. Fuji! 🗻</div>
-              <p class="gift-description">
-                This is a real voucher for the four of us to travel and camp in Japan, see the beautiful Mt. Fuji, and make even more lifelong memories!
-              </p>
-              <div class="gift-footer">I love you, Ellen. Happy Birthday! ❤️</div>
-            </div>
-            <button id="replay-btn" class="btn secondary-btn">Play Again 🔁</button>
-          </div>
+        <p class="congrats-subtitle" style="margin-bottom: 20px;">You completed the journey to Mt. Fuji!</p>
+        
+        <div class="ending-message-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 25px; margin: 20px 0; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);">
+          <p style="font-size: 1.1rem; line-height: 1.6; color: #fff; margin-bottom: 12px; font-weight: 500;">
+            "Thank you for sharing this beautiful journey of life with me. Here's to making many more wonderful memories together, year after year!"
+          </p>
+          <p style="font-family: 'Fredoka', sans-serif; font-size: 1.3rem; color: var(--color-accent); margin-top: 15px; font-weight: 600;">
+            I love you, Ellen! ❤️
+          </p>
         </div>
+
+        <button id="replay-btn" class="btn primary-btn" style="padding: 12px 30px; font-size: 1.05rem; border-radius: 20px; transition: all 0.3s ease;">Play Again 🔁</button>
       </div>
     </div>
 
