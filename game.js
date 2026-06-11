@@ -233,6 +233,7 @@ const Game = {
   init() {
     this.canvas = document.getElementById('gameCanvas');
     this.ctx = this.canvas.getContext('2d');
+    this.canvas.focus();
     
     // Scale for high-DPI screens
     this.resizeCanvas();
@@ -637,6 +638,7 @@ const Game = {
 
   startGame() {
     this.isRunning = true;
+    this.canvas.focus();
     this.loop();
   },
 
