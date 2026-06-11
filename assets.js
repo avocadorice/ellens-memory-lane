@@ -920,6 +920,7 @@ const Assets = {
   // Draw Background Parallax Scenery
   drawScenery(ctx, levelId, stageX, time) {
     ctx.save();
+    ctx.translate(0, 420); // Translate to ground level (y = 420)
 
     switch(levelId) {
       case 1: // Graduation: University Columns
@@ -1095,9 +1096,9 @@ const Assets = {
         break;
 
       case 10: // Mt Fuji and Cherry Blossom
-        this.drawFuji(ctx, stageX, 0, 560, 310);
+        this.drawFuji(ctx, stageX, 0, 680, 370); // Larger and more majestic!
         // Cherry blossoms branch framing the view
-        this.drawCherryBranch(ctx, stageX - 120, -180, time);
+        this.drawCherryBranch(ctx, stageX - 120, -260, time);
         break;
 
       default:
@@ -1298,10 +1299,10 @@ const Assets = {
 
     // 2. Mountain Body (concave sweeping curves)
     const mountainGrad = ctx.createLinearGradient(0, -height, 0, 0);
-    mountainGrad.addColorStop(0, '#1c142c'); // Dark, majestic volcanic purple-blue peak
-    mountainGrad.addColorStop(0.4, '#2d1e3d');
-    mountainGrad.addColorStop(0.75, '#513354'); // Dark lavender
-    mountainGrad.addColorStop(1, '#985e72'); // Warm sunset base
+    mountainGrad.addColorStop(0, '#111827'); // Volcanic dark charcoal-blue peak
+    mountainGrad.addColorStop(0.3, '#1e293b'); // Deep slate blue
+    mountainGrad.addColorStop(0.65, '#3b5284'); // Majestic indigo blue
+    mountainGrad.addColorStop(1, '#637db6'); // Dusty twilight blue base
 
     ctx.fillStyle = mountainGrad;
     ctx.beginPath();
