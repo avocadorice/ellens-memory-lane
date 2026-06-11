@@ -226,6 +226,9 @@ const Game = {
   // Ending / Fireworks state
   fireworks: [],
   isQuizCompleted: false,
+  focusedChapterIndex: 0,
+  gamepadBtnAPressed: false,
+  gamepadMenuPressed: false,
 
   init() {
     this.canvas = document.getElementById('gameCanvas');
@@ -377,22 +380,120 @@ const Game = {
   bindUI() {
     // Keyboard inputs
     window.addEventListener('keydown', (e) => {
-      this.keys[e.code] = true;
+      // Normalize key identifier for TV browsers
+      let code = e.code;
+      if (!code) {
+        if (e.keyCode === 37) code = 'ArrowLeft';
+        else if (e.keyCode === 39) code = 'ArrowRight';
+        else if (e.keyCode === 38) code = 'ArrowUp';
+        else if (e.keyCode === 40) code = 'ArrowDown';
+        else if (e.keyCode === 32) code = 'Space';
+        else if (e.keyCode === 13) code = 'Enter';
+        else if (e.keyCode === 27) code = 'Escape';
+        else if (e.keyCode === 8) code = 'Backspace';
+        else if (e.keyCode === 65) code = 'KeyA';
+        else if (e.keyCode === 68) code = 'KeyD';
+        else if (e.keyCode === 87) code = 'KeyW';
+      }
+
+      this.keys[code] = true;
+      
+      const menu = document.getElementById('chapter-menu-overlay');
+      const startScreen = document.getElementById('start-screen');
+      const endingScreen = document.getElementById('ending-screen');
+
+      // If chapter menu is open, handle D-pad grid navigation
+      if (menu && menu.classList.contains('active')) {
+        const buttons = document.querySelectorAll('.chapter-menu-btn');
+        if (buttons.length > 0) {
+          if (code === 'ArrowRight') {
+            this.focusedChapterIndex = (this.focusedChapterIndex + 1) % buttons.length;
+            this.updateChapterMenuFocus();
+            e.preventDefault();
+            return;
+          } else if (code === 'ArrowLeft') {
+            this.focusedChapterIndex = (this.focusedChapterIndex - 1 + buttons.length) % buttons.length;
+            this.updateChapterMenuFocus();
+            e.preventDefault();
+            return;
+          } else if (code === 'ArrowDown') {
+            if (this.focusedChapterIndex + 2 < buttons.length) {
+              this.focusedChapterIndex += 2;
+            } else {
+              this.focusedChapterIndex = this.focusedChapterIndex % 2;
+            }
+            this.updateChapterMenuFocus();
+            e.preventDefault();
+            return;
+          } else if (code === 'ArrowUp') {
+            if (this.focusedChapterIndex - 2 >= 0) {
+              this.focusedChapterIndex -= 2;
+            } else {
+              const lastRowStart = Math.floor((buttons.length - 1) / 2) * 2;
+              this.focusedChapterIndex = Math.min(buttons.length - 1, lastRowStart + (this.focusedChapterIndex % 2));
+            }
+            this.updateChapterMenuFocus();
+            e.preventDefault();
+            return;
+          } else if (code === 'Enter' || code === 'Space') {
+            buttons[this.focusedChapterIndex].click();
+            e.preventDefault();
+            return;
+          } else if (code === 'Escape' || code === 'Backspace') {
+            document.getElementById('close-menu-btn').click();
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+
+      // Start Screen enter/space trigger
+      if (startScreen && startScreen.classList.contains('active')) {
+        if (code === 'Enter' || code === 'Space') {
+          document.getElementById('start-btn').click();
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // Ending Screen enter/space trigger
+      if (endingScreen && endingScreen.classList.contains('active')) {
+        if (code === 'Enter' || code === 'Space') {
+          document.getElementById('replay-btn').click();
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // Escape or M key to toggle chapter menu
+      if (code === 'Escape' || code === 'KeyM') {
+        if (menu) {
+          if (menu.classList.contains('active')) {
+            document.getElementById('close-menu-btn').click();
+          } else {
+            document.getElementById('hud-menu-btn').click();
+            this.focusedChapterIndex = 0;
+            setTimeout(() => this.updateChapterMenuFocus(), 50);
+          }
+          e.preventDefault();
+          return;
+        }
+      }
       
       // Advance dialogue on Right Arrow, Space, Enter, or D keys
       if (this.isPaused && this.activeDialog) {
-        if (e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'Space' || e.code === 'Enter') {
+        if (code === 'ArrowRight' || code === 'KeyD' || code === 'Space' || code === 'Enter') {
           this.advanceDialogue();
           e.preventDefault();
           return;
         }
       }
 
-      // Teleport shortcuts (1-9 and 0 keys) for fast dev testing
-      if (e.code.startsWith('Digit')) {
-        const num = parseInt(e.code.replace('Digit', ''));
+      // Teleport shortcuts (1-9 and 0 keys) for dev testing
+      if (code.startsWith('Digit')) {
+        const num = parseInt(code.replace('Digit', ''));
         let targetLvlIdx = num - 1;
-        if (num === 0) targetLvlIdx = 9; // key '0' is 10th level Mt Fuji
+        if (num === 0) targetLvlIdx = 9;
         
         if (targetLvlIdx >= 0 && targetLvlIdx < this.levels.length) {
           this.teleportToLevel(targetLvlIdx);
@@ -401,16 +502,28 @@ const Game = {
         }
       }
 
-      if (e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') {
+      if (code === 'Space' || code === 'KeyW' || code === 'ArrowUp') {
         if (this.isRunning && !this.isPaused) {
           this.jump();
-          e.preventDefault(); // stop scrolling browser
+          e.preventDefault();
         }
       }
     });
 
     window.addEventListener('keyup', (e) => {
-      this.keys[e.code] = false;
+      let code = e.code;
+      if (!code) {
+        if (e.keyCode === 37) code = 'ArrowLeft';
+        else if (e.keyCode === 39) code = 'ArrowRight';
+        else if (e.keyCode === 38) code = 'ArrowUp';
+        else if (e.keyCode === 40) code = 'ArrowDown';
+        else if (e.keyCode === 32) code = 'Space';
+        else if (e.keyCode === 13) code = 'Enter';
+        else if (e.keyCode === 65) code = 'KeyA';
+        else if (e.keyCode === 68) code = 'KeyD';
+        else if (e.keyCode === 87) code = 'KeyW';
+      }
+      this.keys[code] = false;
     });
 
     // Start Button
@@ -1078,6 +1191,9 @@ const Game = {
   loop() {
     if (!this.isRunning) return;
 
+    // Poll gamepad inputs
+    this.updateGamepadInput();
+
     // Clear Canvas
     this.ctx.clearRect(0, 0, this.width, this.height);
 
@@ -1095,6 +1211,76 @@ const Game = {
     }
 
     requestAnimationFrame(() => this.loop());
+  },
+
+  updateGamepadInput() {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let gp = null;
+    for (let i = 0; i < gamepads.length; i++) {
+      if (gamepads[i]) {
+        gp = gamepads[i];
+        break;
+      }
+    }
+
+    if (gp) {
+      const axeX = gp.axes[0];
+      const dpadLeft = gp.buttons[14] ? gp.buttons[14].pressed : false;
+      const dpadRight = gp.buttons[15] ? gp.buttons[15].pressed : false;
+      
+      this.keys['ArrowLeft'] = axeX < -0.3 || dpadLeft;
+      this.keys['ArrowRight'] = axeX > 0.3 || dpadRight;
+
+      const btnA = gp.buttons[0] ? gp.buttons[0].pressed : false;
+      const dpadUp = gp.buttons[12] ? gp.buttons[12].pressed : false;
+      
+      if (btnA || dpadUp) {
+        if (this.isRunning && !this.isPaused) {
+          this.jump();
+        } else if (this.isPaused && this.activeDialog) {
+          if (!this.gamepadBtnAPressed) {
+            this.advanceDialogue();
+          }
+        }
+        this.gamepadBtnAPressed = true;
+      } else {
+        this.gamepadBtnAPressed = false;
+      }
+
+      // Start button or Select button to toggle chapter menu
+      const btnStart = gp.buttons[9] ? gp.buttons[9].pressed : false;
+      const btnSelect = gp.buttons[8] ? gp.buttons[8].pressed : false;
+      if (btnStart || btnSelect) {
+        if (!this.gamepadMenuPressed) {
+          const menu = document.getElementById('chapter-menu-overlay');
+          if (menu) {
+            if (menu.classList.contains('active')) {
+              document.getElementById('close-menu-btn').click();
+            } else {
+              document.getElementById('hud-menu-btn').click();
+              this.focusedChapterIndex = 0;
+              setTimeout(() => this.updateChapterMenuFocus(), 50);
+            }
+          }
+        }
+        this.gamepadMenuPressed = true;
+      } else {
+        this.gamepadMenuPressed = false;
+      }
+    }
+  },
+
+  updateChapterMenuFocus() {
+    const buttons = document.querySelectorAll('.chapter-menu-btn');
+    buttons.forEach((btn, idx) => {
+      if (idx === this.focusedChapterIndex) {
+        btn.classList.add('focused');
+        btn.focus();
+        btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else {
+        btn.classList.remove('focused');
+      }
+    });
   }
 };
 
