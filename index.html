@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ellen's Great Adventure 🎂</title>
+  <!-- Google Fonts for premium playful typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Game Container -->
+  <div id="game-container">
+    
+    <!-- Canvas for 2D Game -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI Overlay: Loading Screen -->
+    <div id="loading-screen" class="overlay active">
+      <div class="loader-content">
+        <div class="heart-loader">❤️</div>
+        <h1>Loading Ellen's Adventure...</h1>
+        <p>Getting the memories ready...</p>
+      </div>
+    </div>
+
+    <!-- UI Overlay: Start Screen -->
+    <div id="start-screen" class="overlay">
+      <div class="glass-panel menu-panel">
+        <div class="heart-header">💖</div>
+        <h1 class="title">Ellen's Great Adventure</h1>
+        <p class="subtitle">A walk through the beautiful moments of our life together.</p>
+        
+        <div class="instructions">
+          <h3>How to Play:</h3>
+          <div class="control-hints">
+            <div class="hint-item">
+              <span class="key">⬅️</span> <span class="key">➡️</span> or <span class="key">A</span> <span class="key">D</span>
+              <span class="hint-text">Walk Left & Right</span>
+            </div>
+            <div class="hint-item">
+              <span class="key">Space</span> or <span class="key">⬆️</span> or <span class="key">W</span>
+              <span class="hint-text">Jump over hurdles</span>
+            </div>
+            <div class="hint-item mobile-only-hint">
+              <span class="hint-text">Or use the on-screen buttons on mobile!</span>
+            </div>
+          </div>
+        </div>
+
+        <button id="start-btn" class="btn primary-btn">Start the Journey</button>
+        <div class="audio-toggle-container">
+          <label class="switch">
+            <input type="checkbox" id="music-toggle" checked>
+            <span class="slider round"></span>
+          </label>
+          <span class="audio-label">Play Nostalgic Music 🎵</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Overlay: Memory Dialog Box -->
+    <div id="dialog-overlay" class="dialog-container">
+      <div class="glass-panel dialog-panel">
+        <div class="dialog-header">
+          <span id="dialog-title">Memory Locked</span>
+          <span class="dialog-date" id="dialog-date">Year</span>
+        </div>
+        <div class="dialog-body">
+          <p id="dialog-text">Loading memory...</p>
+        </div>
+        <div class="dialog-footer">
+          <button id="dialog-action-btn" class="btn secondary-btn">Continue Walk ➡️</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Overlay: Ending Screen & Gift Unlock -->
+    <div id="ending-screen" class="overlay">
+      <div class="glass-panel ending-panel">
+        <div class="fireworks-container" id="fireworks"></div>
+        <h1 class="congrats-title">Happy Birthday, Ellen! 🎂</h1>
+        <p class="congrats-subtitle">You completed the journey to Mt. Fuji! But there is one last surprise...</p>
+
+        <!-- The Gift Box Reveal -->
+        <div id="gift-section" class="ending-section active">
+          <h3>Your Birthday Gift! 🎁</h3>
+          <p class="gift-intro">You've unlocked the secret treasure. Click the box to open it!</p>
+          
+          <div class="gift-box-wrapper">
+            <div id="gift-box" class="gift-box closed shaking">
+              <div class="gift-lid"></div>
+              <div class="gift-ribbon"></div>
+              <div class="gift-body"></div>
+            </div>
+          </div>
+
+          <div id="gift-content" class="gift-content hidden">
+            <h2>✨ Special Gift Ticket ✨</h2>
+            <div class="gift-card">
+              <div class="gift-title">A Family Getaway to Mt. Fuji! 🗻</div>
+              <p class="gift-description">
+                This is a real voucher for the four of us to travel and camp in Japan, see the beautiful Mt. Fuji, and make even more lifelong memories!
+              </p>
+              <div class="gift-footer">I love you, Ellen. Happy Birthday! ❤️</div>
+            </div>
+            <button id="replay-btn" class="btn secondary-btn">Play Again 🔁</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Chapter Menu -->
+    <div id="chapter-menu-overlay" class="chapter-menu-container">
+      <div class="glass-panel chapter-panel">
+        <h2>Jump to Memory (Dev Mode)</h2>
+        <div id="chapter-buttons-list" class="chapter-buttons-list">
+          <!-- Dynamically populated -->
+        </div>
+        <button id="close-menu-btn" class="btn secondary-btn" style="margin-top: 15px; padding: 8px 20px; font-size: 0.9rem;">Close Menu</button>
+      </div>
+    </div>
+
+    <!-- Mobile Virtual Controls -->
+    <div id="mobile-controls">
+      <button id="btn-left" class="ctrl-btn">◀</button>
+      <button id="btn-jump" class="ctrl-btn action-btn">JUMP</button>
+      <button id="btn-right" class="ctrl-btn">▶</button>
+    </div>
+
+    <!-- HUD Controls (Visible during gameplay) -->
+    <div id="hud-controls">
+      <button id="hud-menu-btn" class="hud-btn" title="Chapters Select">📖</button>
+      <button id="hud-sound-btn" class="hud-btn" title="Mute/Unmute BGM">🔊</button>
+    </div>
+  </div>
+
+  <!-- Game Scripts -->
+  <script src="assets.js"></script>
+  <script src="levels.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

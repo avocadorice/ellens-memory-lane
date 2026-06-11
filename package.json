@@ -1,0 +1,14 @@
+{
+  "name": "ellens-great-adventure",
+  "version": "1.0.0",
+  "description": "A 2D side-scrolling birthday memory lane game for Ellen.",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx http-server -p 3000 -c-1",
+    "start": "npx http-server -p 3000 -c-1"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
