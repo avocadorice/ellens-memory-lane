@@ -1,0 +1,24 @@
+{
+  "name": "Ellen's Great Adventure",
+  "short_name": "Ellen's Adventure",
+  "description": "A 2D side-scrolling birthday memory lane game for Ellen.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#ff7e5f",
+  "theme_color": "#ff7e5f",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["games"],
+  "prefer_related_applications": false
+}
