@@ -735,6 +735,9 @@ input:checked + .slider:before {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  pointer-events: none;
   z-index: 99;
+}
+
+#gameCanvas {
+  outline: none;
 }

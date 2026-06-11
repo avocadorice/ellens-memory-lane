@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.avocadorice.twa",
+        "sha256_cert_fingerprints": ["FD:91:BE:74:77:55:F5:10:5F:79:71:55:DE:06:B1:70:61:7B:BB:CE:A6:CE:5D:AA:48:A5:FB:6B:D7:DC:46:2C"]
+      }
+    }]
