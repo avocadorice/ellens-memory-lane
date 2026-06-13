@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ellens-adventure-cache-v5';
+const CACHE_NAME = 'ellens-adventure-cache-v6';
 const ASSETS = [
   './',
   './index.html',
