@@ -120,7 +120,13 @@ const AudioEngine = {
         if (this.beatNumber % 4 === 0) {
           const chordIdx = Math.floor(this.beatNumber / 4) % chords.length;
           const chord = chords[chordIdx];
-          chord.forEach(noteName => {
+          
+          // TV optimization: Only play root and fifth (2 notes) to save CPU/voices
+          const isOptimized = !Assets.checkOptimize();
+          const activeNotes = isOptimized ? [chord[0], chord[2] || chord[1]] : chord;
+
+          activeNotes.forEach(noteName => {
+            if (!noteName) return;
             const freq = notes[noteName] || 130.81;
             this.playSynthNote(freq, noteTime, 1.8, 0.03, 'triangle');
           });
@@ -319,6 +325,7 @@ const Game = {
     
     // Scale for high-DPI screens
     this.resizeCanvas();
+    this.updateOptimizationState();
     window.addEventListener('resize', () => this.resizeCanvas());
 
     this.player.y = this.height - 80; // Ground height y = 420
@@ -360,11 +367,27 @@ const Game = {
     this.canvas.style.width = `${targetWidth}px`;
     this.canvas.style.height = `${targetHeight}px`;
     
-    // Handle High DPI (cap at 1.25 on TVs/4K displays to avoid rendering lag)
-    const dpr = Math.min(1.25, window.devicePixelRatio || 1);
+    // Handle High DPI (cap at 1.0 on TV optimizations, 1.25 on high-end to avoid rendering lag)
+    const isOptimized = !Assets.checkOptimize();
+    const dprCap = isOptimized ? 1.0 : 1.25;
+    const dpr = Math.min(dprCap, window.devicePixelRatio || 1);
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
     this.ctx.scale(dpr, dpr);
+  },
+
+  updateOptimizationState() {
+    const isOptimized = !Assets.checkOptimize();
+    
+    // Toggle body class for blur filters
+    if (isOptimized) {
+      document.body.classList.add('no-blur');
+    } else {
+      document.body.classList.remove('no-blur');
+    }
+
+    // Trigger canvas resize to adjust DPR resolution scale
+    this.resizeCanvas();
   },
 
   setupWorld() {
@@ -733,6 +756,7 @@ const Game = {
       Assets.noOptimize = nextState;
       Game.useWasm = !nextState;
       Assets.clearCache();
+      this.updateOptimizationState();
       this.updateDevPanel();
       this.canvas.focus();
     });

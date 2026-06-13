@@ -776,3 +776,13 @@ input:checked + .slider:before {
   font-family: monospace;
   font-weight: bold;
 }
+
+/* TV Optimization: Disable expensive GPU backdrop blurs when optimizations are active */
+body.no-blur .glass-panel,
+body.no-blur .hud-btn,
+body.no-blur .chapter-menu-container,
+body.no-blur .ctrl-btn {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(20, 20, 30, 0.92) !important; /* Slightly more opaque background to maintain readability without blur */
+}
