@@ -33,7 +33,11 @@ const AudioEngine = {
   ctx: null,
   isPlaying: false,
   tempo: 105, // BPM
-  bgmInterval: null,
+  schedulerInterval: null,
+  nextNoteTime: 0.0,
+  beatNumber: 0,
+  scheduleAheadTime: 0.100, // sec
+  lookahead: 25.0, // ms
   
   init() {
     try {
@@ -78,37 +82,43 @@ const AudioEngine = {
       'C5', 'E5', 'G5', 'B5', 'A5', null, 'G5', 'E5'
     ];
 
-    let beat = 0;
-    this.bgmInterval = setInterval(() => {
+    this.nextNoteTime = this.ctx.currentTime;
+    this.beatNumber = 0;
+    const beatLen = 60.0 / this.tempo;
+
+    this.schedulerInterval = setInterval(() => {
       if (!this.isPlaying) return;
-      const time = this.ctx.currentTime;
+      
+      // Look-ahead schedule loop
+      while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
+        // Play chords on every measure (4 beats)
+        if (this.beatNumber % 4 === 0) {
+          const chordIdx = Math.floor(this.beatNumber / 4) % chords.length;
+          const chord = chords[chordIdx];
+          chord.forEach(noteName => {
+            const freq = notes[noteName] || 130.81;
+            this.playSynthNote(freq, this.nextNoteTime, 1.8, 0.03, 'triangle');
+          });
+        }
 
-      // Play chords on every measure (4 beats)
-      if (beat % 4 === 0) {
-        const chordIdx = Math.floor(beat / 4) % chords.length;
-        const chord = chords[chordIdx];
-        chord.forEach(noteName => {
-          const freq = notes[noteName] || 130.81;
-          this.playSynthNote(freq, time, 1.8, 0.03, 'triangle');
-        });
+        // Play melody note
+        const melNote = melody[this.beatNumber % melody.length];
+        if (melNote) {
+          const freq = notes[melNote];
+          this.playSynthNote(freq, this.nextNoteTime, 0.45, 0.05, 'sine');
+        }
+
+        this.nextNoteTime += beatLen;
+        this.beatNumber++;
       }
-
-      // Play melody note
-      const melNote = melody[beat % melody.length];
-      if (melNote) {
-        const freq = notes[melNote];
-        this.playSynthNote(freq, time, 0.45, 0.05, 'sine');
-      }
-
-      beat++;
-    }, 60000 / this.tempo);
+    }, this.lookahead);
   },
 
   stopBGM() {
     this.isPlaying = false;
-    if (this.bgmInterval) {
-      clearInterval(this.bgmInterval);
-      this.bgmInterval = null;
+    if (this.schedulerInterval) {
+      clearInterval(this.schedulerInterval);
+      this.schedulerInterval = null;
     }
   },
 
@@ -440,6 +450,13 @@ const Game = {
         else if (e.keyCode === 87) code = 'KeyW';
       }
 
+      // Prevent default browser spatial navigation focus changes on TV during gameplay
+      if (this.isRunning && !this.isPaused) {
+        if (code === 'ArrowLeft' || code === 'ArrowRight' || code === 'ArrowUp' || code === 'ArrowDown' || code === 'Space') {
+          e.preventDefault();
+        }
+      }
+
       this.keys[code] = true;
       
       const menu = document.getElementById('chapter-menu-overlay');
@@ -649,6 +666,30 @@ const Game = {
       this.resetGame();
     });
 
+    // Dev HUD control
+    document.getElementById('hud-dev-btn').addEventListener('click', () => {
+      const devPanel = document.getElementById('dev-panel');
+      if (devPanel) {
+        devPanel.classList.toggle('active');
+        this.updateDevPanel();
+      }
+    });
+
+    // Dev Panel toggle optimizations
+    document.getElementById('dev-toggle-opt-btn').addEventListener('click', () => {
+      const nextState = !Assets.checkOptimize();
+      Assets.noOptimize = nextState;
+      Game.useWasm = !nextState;
+      Assets.clearCache();
+      this.updateDevPanel();
+    });
+
+    // Dev Panel clear cache
+    document.getElementById('dev-clear-cache-btn').addEventListener('click', () => {
+      Assets.clearCache();
+      this.updateDevPanel();
+    });
+
     // Mobile buttons touch bindings
     const leftBtn = document.getElementById('btn-left');
     const rightBtn = document.getElementById('btn-right');
@@ -677,6 +718,54 @@ const Game = {
     handleTouchStart(leftBtn, 'ArrowLeft');
     handleTouchStart(rightBtn, 'ArrowRight');
     handleTouchStart(jumpBtn, 'KeyW');
+  },
+
+  updateDevPanel() {
+    const devPanel = document.getElementById('dev-panel');
+    if (!devPanel || !devPanel.classList.contains('active')) return;
+
+    const fpsSpan = document.getElementById('dev-fps');
+    if (fpsSpan) {
+      fpsSpan.innerText = Math.round(this.smoothedFps || 0);
+    }
+
+    const optSpan = document.getElementById('dev-opt-status');
+    if (optSpan) {
+      const noOpt = Assets.checkOptimize();
+      optSpan.innerText = noOpt ? 'OFF (Original)' : 'ON (Optimized)';
+      optSpan.style.color = noOpt ? '#ff5400' : '#52b788';
+    }
+
+    const wasmSpan = document.getElementById('dev-wasm-status');
+    if (wasmSpan) {
+      const active = wasmExports && (Game.useWasm !== false);
+      wasmSpan.innerText = active ? 'Active (WASM)' : 'Inactive (JS)';
+      wasmSpan.style.color = active ? '#52b788' : '#ff5400';
+    }
+
+    const cacheSpan = document.getElementById('dev-cache-count');
+    if (cacheSpan) {
+      cacheSpan.innerText = Object.keys(Assets._cache || {}).length;
+    }
+
+    const partSpan = document.getElementById('dev-particles');
+    if (partSpan) {
+      let activeCount = 0;
+      if (wasmExports && (Game.useWasm !== false)) {
+        const MAX_PARTICLES = 300;
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+          if (wasmExports.getParticleActive(i) !== 0) activeCount++;
+        }
+      } else {
+        activeCount = this.fireworks.length;
+      }
+      partSpan.innerText = activeCount;
+    }
+
+    const posSpan = document.getElementById('dev-player-pos');
+    if (posSpan) {
+      posSpan.innerText = `X: ${Math.round(this.player.x)}, Y: ${Math.round(this.player.y)}`;
+    }
   },
 
   startGame() {
@@ -1385,6 +1474,24 @@ const Game = {
 
   loop() {
     if (!this.isRunning) return;
+
+    // FPS calculation
+    const now = performance.now();
+    if (this.lastFrameTime) {
+      const delta = now - this.lastFrameTime;
+      const currentFps = 1000 / delta;
+      if (!this.smoothedFps) this.smoothedFps = currentFps;
+      this.smoothedFps += (currentFps - this.smoothedFps) * 0.1;
+    }
+    this.lastFrameTime = now;
+
+    // Update Dev Panel metrics every 15 frames
+    if (!this.devUpdateFrameCount) this.devUpdateFrameCount = 0;
+    this.devUpdateFrameCount++;
+    if (this.devUpdateFrameCount >= 15) {
+      this.devUpdateFrameCount = 0;
+      this.updateDevPanel();
+    }
 
     // Poll gamepad inputs
     this.updateGamepadInput();

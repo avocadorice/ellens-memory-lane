@@ -122,6 +122,20 @@
     <div id="hud-controls">
       <button id="hud-menu-btn" class="hud-btn" title="Chapters Select">📖</button>
       <button id="hud-sound-btn" class="hud-btn" title="Mute/Unmute BGM">🔊</button>
+      <button id="hud-dev-btn" class="hud-btn" title="Developer Options">🛠️</button>
+    </div>
+
+    <!-- Dev Panel Overlay -->
+    <div id="dev-panel" class="glass-panel dev-panel">
+      <h3 style="margin: 0 0 10px 0; font-size: 0.95rem; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px; text-align: center;">Dev Panel 🛠️</h3>
+      <div class="dev-metric"><span>FPS:</span><span id="dev-fps">0</span></div>
+      <div class="dev-metric"><span>Optimizations:</span><span id="dev-opt-status">ON</span></div>
+      <div class="dev-metric"><span>WebAssembly:</span><span id="dev-wasm-status">Active</span></div>
+      <div class="dev-metric"><span>Cached Sprites:</span><span id="dev-cache-count">0</span></div>
+      <div class="dev-metric"><span>Active Particles:</span><span id="dev-particles">0</span></div>
+      <div class="dev-metric"><span>Player Pos:</span><span id="dev-player-pos">X: 150, Y: 420</span></div>
+      <button id="dev-toggle-opt-btn" class="btn secondary-btn" style="width: 100%; margin-top: 10px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Toggle Cache/WASM</button>
+      <button id="dev-clear-cache-btn" class="btn secondary-btn" style="width: 100%; margin-top: 5px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Clear Sprite Cache</button>
     </div>
   </div>
 
