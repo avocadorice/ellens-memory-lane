@@ -17,6 +17,9 @@ async function initWasm() {
       env: {
         abort: (msg, file, line, col) => {
           console.error(`Abort called at ${file}:${line}:${col} - ${msg}`);
+        },
+        seed: () => {
+          return Math.random();
         }
       }
     });
