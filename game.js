@@ -64,6 +64,10 @@ const AudioEngine = {
   playBGM() {
     if (this.isPlaying) return;
     if (!this.ctx) this.init();
+    if (!this.ctx) {
+      console.warn("AudioEngine: AudioContext is not available.");
+      return;
+    }
     this.resume();
     this.isPlaying = true;
 
@@ -476,6 +480,7 @@ const Game = {
     window.addEventListener('keydown', (e) => {
       // Normalize key identifier for TV browsers
       let code = e.code;
+      console.log("Keydown: " + code);
       if (!code) {
         if (e.keyCode === 37) code = 'ArrowLeft';
         else if (e.keyCode === 39) code = 'ArrowRight';
@@ -624,6 +629,7 @@ const Game = {
         else if (e.keyCode === 68) code = 'KeyD';
         else if (e.keyCode === 87) code = 'KeyW';
       }
+      console.log("Keyup: " + code);
       this.keys[code] = false;
     });
 
@@ -932,6 +938,10 @@ const Game = {
     const walkLeft = (this.keys['KeyA'] || this.keys['ArrowLeft']) ? 1 : 0;
     const walkRight = (this.keys['KeyD'] || this.keys['ArrowRight']) ? 1 : 0;
     const endX = this.levels[this.levels.length - 1].x;
+
+    if (walkLeft || walkRight) {
+      console.log("walkLeft: " + walkLeft + ", walkRight: " + walkRight + ", wasm: " + !!wasmExports);
+    }
 
     if (wasmExports) {
       wasmExports.updatePlayerPhysics(walkLeft, walkRight, endX);
