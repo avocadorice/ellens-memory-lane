@@ -1,5 +1,33 @@
 // Core Game Engine for Ellen's Great Adventure
 
+// --- WEBASSEMBLY PHYSICS MODULE ---
+let wasmInstance = null;
+let wasmExports = null;
+
+async function initWasm() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('no_optimize') === 'true') {
+      console.log("WebAssembly physics module disabled via URL parameter.");
+      return;
+    }
+    const response = await fetch('physics.wasm');
+    const bytes = await response.arrayBuffer();
+    const result = await WebAssembly.instantiate(bytes, {
+      env: {
+        abort: (msg, file, line, col) => {
+          console.error(`Abort called at ${file}:${line}:${col} - ${msg}`);
+        }
+      }
+    });
+    wasmInstance = result.instance;
+    wasmExports = wasmInstance.exports;
+    console.log("WebAssembly physics module loaded successfully!");
+  } catch (e) {
+    console.error("Failed to load WebAssembly module, falling back to JavaScript physics:", e);
+  }
+}
+
 // --- AUDIO ENGINE (Web Audio API Procedural Synth) ---
 const AudioEngine = {
   ctx: null,
@@ -240,6 +268,9 @@ const Game = {
     window.addEventListener('resize', () => this.resizeCanvas());
 
     this.player.y = this.height - 80; // Ground height y = 420
+    if (wasmExports) {
+      wasmExports.initPlayer(this.player.x, this.player.y);
+    }
 
     // Hook DOM UI events
     this.bindUI();
@@ -349,9 +380,21 @@ const Game = {
 
     // Teleport player slightly to the left of the target milestone (lets them walk in)
     const lvl = this.levels[lvlIndex];
-    this.player.x = lvl.x - 160;
-    this.player.vx = 0;
-    this.player.vy = 0;
+    const targetX = lvl.x - 160;
+    if (wasmExports) {
+      wasmExports.initPlayer(targetX, this.height - 80);
+      this.player.x = wasmExports.player_x.value;
+      this.player.y = wasmExports.player_y.value;
+      this.player.vx = wasmExports.player_vx.value;
+      this.player.vy = wasmExports.player_vy.value;
+      this.player.isGrounded = wasmExports.player_isGrounded.value !== 0;
+      this.player.dir = wasmExports.player_dir.value;
+      this.player.animFrame = wasmExports.player_animFrame.value;
+    } else {
+      this.player.x = targetX;
+      this.player.vx = 0;
+      this.player.vy = 0;
+    }
 
     // Center camera
     this.camera.x = this.player.x - this.width / 3;
@@ -643,11 +686,23 @@ const Game = {
   },
 
   resetGame() {
-    this.player.x = 150;
-    this.player.y = this.height - 80;
-    this.player.vx = 0;
-    this.player.vy = 0;
-    this.player.outfit = 'graduation';
+    if (wasmExports) {
+      wasmExports.initPlayer(150, this.height - 80);
+      this.player.x = wasmExports.player_x.value;
+      this.player.y = wasmExports.player_y.value;
+      this.player.vx = wasmExports.player_vx.value;
+      this.player.vy = wasmExports.player_vy.value;
+      this.player.isGrounded = wasmExports.player_isGrounded.value !== 0;
+      this.player.dir = wasmExports.player_dir.value;
+      this.player.animFrame = wasmExports.player_animFrame.value;
+      this.player.outfit = 'graduation';
+    } else {
+      this.player.x = 150;
+      this.player.y = this.height - 80;
+      this.player.vx = 0;
+      this.player.vy = 0;
+      this.player.outfit = 'graduation';
+    }
     this.camera.x = 0;
     this.currentLevelIndex = 0;
     this.isPaused = false;
@@ -659,10 +714,19 @@ const Game = {
   },
 
   jump() {
-    if (this.player.isGrounded) {
-      this.player.vy = this.player.jumpForce;
-      this.player.isGrounded = false;
-      AudioEngine.playJumpSFX();
+    if (wasmExports) {
+      const didJump = wasmExports.playerJump();
+      if (didJump) {
+        this.player.vy = wasmExports.player_vy.value;
+        this.player.isGrounded = wasmExports.player_isGrounded.value !== 0;
+        AudioEngine.playJumpSFX();
+      }
+    } else {
+      if (this.player.isGrounded) {
+        this.player.vy = this.player.jumpForce;
+        this.player.isGrounded = false;
+        AudioEngine.playJumpSFX();
+      }
     }
   },
 
@@ -729,39 +793,50 @@ const Game = {
 
   updatePhysics() {
     // Apply Left/Right movements
-    const walkLeft = this.keys['KeyA'] || this.keys['ArrowLeft'];
-    const walkRight = this.keys['KeyD'] || this.keys['ArrowRight'];
-
-    if (walkLeft) {
-      this.player.vx = -this.player.speed;
-      this.player.dir = -1;
-      this.player.animFrame++;
-    } else if (walkRight) {
-      this.player.vx = this.player.speed;
-      this.player.dir = 1;
-      this.player.animFrame++;
-    } else {
-      this.player.vx *= 0.7; // friction
-      if (Math.abs(this.player.vx) < 0.2) this.player.vx = 0;
-    }
-
-    // Apply gravity
-    this.player.vy += this.player.gravity;
-    this.player.y += this.player.vy;
-    this.player.x += this.player.vx;
-
-    // Ground collision
-    const groundY = this.height - 80;
-    if (this.player.y >= groundY) {
-      this.player.y = groundY;
-      this.player.vy = 0;
-      this.player.isGrounded = true;
-    }
-
-    // Map limits
+    const walkLeft = (this.keys['KeyA'] || this.keys['ArrowLeft']) ? 1 : 0;
+    const walkRight = (this.keys['KeyD'] || this.keys['ArrowRight']) ? 1 : 0;
     const endX = this.levels[this.levels.length - 1].x;
-    if (this.player.x < 40) this.player.x = 40;
-    if (this.player.x > endX) this.player.x = endX;
+
+    if (wasmExports) {
+      wasmExports.updatePlayerPhysics(walkLeft, walkRight, endX);
+      this.player.x = wasmExports.player_x.value;
+      this.player.y = wasmExports.player_y.value;
+      this.player.vx = wasmExports.player_vx.value;
+      this.player.vy = wasmExports.player_vy.value;
+      this.player.isGrounded = wasmExports.player_isGrounded.value !== 0;
+      this.player.dir = wasmExports.player_dir.value;
+      this.player.animFrame = wasmExports.player_animFrame.value;
+    } else {
+      if (walkLeft) {
+        this.player.vx = -this.player.speed;
+        this.player.dir = -1;
+        this.player.animFrame++;
+      } else if (walkRight) {
+        this.player.vx = this.player.speed;
+        this.player.dir = 1;
+        this.player.animFrame++;
+      } else {
+        this.player.vx *= 0.7; // friction
+        if (Math.abs(this.player.vx) < 0.2) this.player.vx = 0;
+      }
+
+      // Apply gravity
+      this.player.vy += this.player.gravity;
+      this.player.y += this.player.vy;
+      this.player.x += this.player.vx;
+
+      // Ground collision
+      const groundY = this.height - 80;
+      if (this.player.y >= groundY) {
+        this.player.y = groundY;
+        this.player.vy = 0;
+        this.player.isGrounded = true;
+      }
+
+      // Map limits
+      if (this.player.x < 40) this.player.x = 40;
+      if (this.player.x > endX) this.player.x = endX;
+    }
 
     // Set Ellen's outfit based on current level milestone reached
     const lvlIdx = this.getLevelIndexAtX(this.player.x);
@@ -790,8 +865,15 @@ const Game = {
     // Check collectible Heart collisions
     this.hearts.forEach(heart => {
       if (!heart.collected) {
-        const dist = Math.hypot((this.player.x - 5) - heart.x, (this.player.y - 35) - heart.y);
-        if (dist < 28) {
+        let isColliding = false;
+        if (wasmExports) {
+          isColliding = wasmExports.checkHeartCollision(heart.x, heart.y) !== 0;
+        } else {
+          const dist = Math.hypot((this.player.x - 5) - heart.x, (this.player.y - 35) - heart.y);
+          isColliding = dist < 28;
+        }
+
+        if (isColliding) {
           heart.collected = true;
           this.heartsCollected++;
           this.updateHeartsUI();
@@ -802,16 +884,24 @@ const Game = {
 
     // Check hurdle obstacle collisions (slowing the player down slightly, but safe)
     this.hurdles.forEach(hurdle => {
-      const px = this.player.x;
-      const py = this.player.y;
-      
-      const hDist = Math.abs(px - hurdle.x);
-      const vDist = py - hurdle.y;
+      if (wasmExports) {
+        const collided = wasmExports.checkHurdleCollision(hurdle.x, hurdle.y);
+        if (collided) {
+          this.player.x = wasmExports.player_x.value;
+          this.player.vx = wasmExports.player_vx.value;
+        }
+      } else {
+        const px = this.player.x;
+        const py = this.player.y;
+        
+        const hDist = Math.abs(px - hurdle.x);
+        const vDist = py - hurdle.y;
 
-      if (hDist < 25 && vDist > -25 && vDist < 5) {
-        // Simple bounce back collision physics
-        this.player.x -= this.player.dir * 12;
-        this.player.vx = -this.player.dir * 3;
+        if (hDist < 25 && vDist > -25 && vDist < 5) {
+          // Simple bounce back collision physics
+          this.player.x -= this.player.dir * 12;
+          this.player.vx = -this.player.dir * 3;
+        }
       }
     });
 
@@ -956,6 +1046,11 @@ const Game = {
     this.isPaused = true;
     this.isRunning = false;
 
+    if (wasmExports) {
+      wasmExports.initParticles();
+    }
+    this.fireworks = [];
+
     // Win sound chime
     AudioEngine.playWinSFX();
 
@@ -1024,33 +1119,99 @@ const Game = {
   drawParallaxHills(lvlIdx) {
     const camX = this.camera.x;
     
-    // Far hills (Slowest scroll speed: 0.15)
-    this.ctx.fillStyle = lvlIdx >= 7 ? '#0b1626' : (lvlIdx >= 4 ? '#2b442b' : '#32531d');
-    this.ctx.beginPath();
-    this.ctx.moveTo(0, this.height - 80);
-    // Draw 3 rolling waves (optimized loop step)
-    for (let x = 0; x <= this.width; x += 30) {
-      const scrollPos = x + camX * 0.15;
-      const y = this.height - 110 + Math.sin(scrollPos * 0.005) * 20 + Math.cos(scrollPos * 0.01) * 8;
-      this.ctx.lineTo(x, y);
-    }
-    this.ctx.lineTo(this.width, this.height - 80);
-    this.ctx.closePath();
-    this.ctx.fill();
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('no_optimize') === 'true') {
+      // Old dynamic drawing loops
+      // Far hills (Slowest scroll speed: 0.15)
+      this.ctx.fillStyle = lvlIdx >= 7 ? '#0b1626' : (lvlIdx >= 4 ? '#2b442b' : '#32531d');
+      this.ctx.beginPath();
+      this.ctx.moveTo(0, this.height - 80);
+      for (let x = 0; x <= this.width; x += 30) {
+        const scrollPos = x + camX * 0.15;
+        const y = this.height - 110 + Math.sin(scrollPos * 0.005) * 20 + Math.cos(scrollPos * 0.01) * 8;
+        this.ctx.lineTo(x, y);
+      }
+      this.ctx.lineTo(this.width, this.height - 80);
+      this.ctx.closePath();
+      this.ctx.fill();
 
-    // Mid hills (Medium scroll speed: 0.3)
-    this.ctx.fillStyle = lvlIdx >= 7 ? '#122538' : (lvlIdx >= 4 ? '#385838' : '#47752b');
-    this.ctx.beginPath();
-    this.ctx.moveTo(0, this.height - 80);
-    // Optimized loop step
-    for (let x = 0; x <= this.width; x += 30) {
-      const scrollPos = x + camX * 0.3;
-      const y = this.height - 95 + Math.sin(scrollPos * 0.008) * 12 + Math.cos(scrollPos * 0.015) * 5;
-      this.ctx.lineTo(x, y);
+      // Mid hills (Medium scroll speed: 0.3)
+      this.ctx.fillStyle = lvlIdx >= 7 ? '#122538' : (lvlIdx >= 4 ? '#385838' : '#47752b');
+      this.ctx.beginPath();
+      this.ctx.moveTo(0, this.height - 80);
+      for (let x = 0; x <= this.width; x += 30) {
+        const scrollPos = x + camX * 0.3;
+        const y = this.height - 95 + Math.sin(scrollPos * 0.008) * 12 + Math.cos(scrollPos * 0.015) * 5;
+        this.ctx.lineTo(x, y);
+      }
+      this.ctx.lineTo(this.width, this.height - 80);
+      this.ctx.closePath();
+      this.ctx.fill();
+      return;
     }
-    this.ctx.lineTo(this.width, this.height - 80);
-    this.ctx.closePath();
-    this.ctx.fill();
+
+    // Determine color state (0, 1, 2)
+    const state = lvlIdx >= 7 ? 2 : (lvlIdx >= 4 ? 1 : 0);
+    
+    // Lazy render far hills
+    const farKey = `far_hills_${state}`;
+    if (!Assets._cache[farKey]) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 4300;
+      canvas.height = 150;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = state === 2 ? '#0b1626' : (state === 1 ? '#2b442b' : '#32531d');
+      ctx.beginPath();
+      ctx.moveTo(0, 150);
+      for (let x = 0; x <= 4300; x += 4) {
+        const y = 40 - (Math.sin(x * 0.005) * 20 + Math.cos(x * 0.01) * 8);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(4300, 150);
+      ctx.closePath();
+      ctx.fill();
+      Assets._cache[farKey] = canvas;
+    }
+    
+    // Lazy render mid hills
+    const midKey = `mid_hills_${state}`;
+    if (!Assets._cache[midKey]) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 4300;
+      canvas.height = 150;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = state === 2 ? '#122538' : (state === 1 ? '#385838' : '#47752b');
+      ctx.beginPath();
+      ctx.moveTo(0, 150);
+      for (let x = 0; x <= 4300; x += 4) {
+        const y = 55 - (Math.sin(x * 0.008) * 12 + Math.cos(x * 0.015) * 5);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(4300, 150);
+      ctx.closePath();
+      ctx.fill();
+      Assets._cache[midKey] = canvas;
+    }
+
+    const farCanvas = Assets._cache[farKey];
+    const midCanvas = Assets._cache[midKey];
+    
+    const farSrcX = camX * 0.15;
+    const midSrcX = camX * 0.3;
+    
+    // Draw far hills
+    this.ctx.drawImage(
+      farCanvas,
+      farSrcX, 0, this.width, 150,
+      0, this.height - 150, this.width, 150
+    );
+    
+    // Draw mid hills
+    this.ctx.drawImage(
+      midCanvas,
+      midSrcX, 0, this.width, 150,
+      0, this.height - 150, this.width, 150
+    );
   },
 
   drawForeground() {
@@ -1148,47 +1309,78 @@ const Game = {
 
   // Final celebration fireworks system
   updateFireworks() {
-    // Generate new firework bursts
-    if (Math.random() < 0.05) {
-      const fx = Math.random() * this.width;
-      const fy = Math.random() * (this.height - 150);
-      const color = `hsl(${Math.random() * 360}, 100%, 65%)`;
-      
-      // Spawn particles
-      for (let i = 0; i < 40; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 5 + 2;
-        this.fireworks.push({
-          x: fx,
-          y: fy,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color: color,
-          alpha: 1,
-          decay: Math.random() * 0.015 + 0.01
-        });
+    if (wasmExports) {
+      // WASM-based Particle System
+      if (Math.random() < 0.05) {
+        const fx = Math.random() * this.width;
+        const fy = Math.random() * (this.height - 150);
+        const hue = Math.random() * 360;
+        wasmExports.spawnFireworkBurst(fx, fy, hue);
       }
+
+      wasmExports.updateFireworksWasm();
+
+      const MAX_PARTICLES = 300;
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        const active = wasmExports.getParticleActive(i);
+        if (active !== 0) {
+          const px = wasmExports.getParticleX(i);
+          const py = wasmExports.getParticleY(i);
+          const hue = wasmExports.getParticleHue(i);
+          const alpha = wasmExports.getParticleAlpha(i);
+
+          this.ctx.save();
+          this.ctx.globalAlpha = alpha;
+          this.ctx.fillStyle = `hsl(${hue}, 100%, 65%)`;
+          this.ctx.beginPath();
+          this.ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.restore();
+        }
+      }
+    } else {
+      // JS Fallback
+      if (Math.random() < 0.05) {
+        const fx = Math.random() * this.width;
+        const fy = Math.random() * (this.height - 150);
+        const color = `hsl(${Math.random() * 360}, 100%, 65%)`;
+        
+        // Spawn particles
+        for (let i = 0; i < 40; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = Math.random() * 5 + 2;
+          this.fireworks.push({
+            x: fx,
+            y: fy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            color: color,
+            alpha: 1,
+            decay: Math.random() * 0.015 + 0.01
+          });
+        }
+      }
+
+      // Update and draw fireworks particles
+      this.fireworks.forEach((p, idx) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.08; // gravity on sparks
+        p.alpha -= p.decay;
+
+        this.ctx.save();
+        this.ctx.globalAlpha = p.alpha;
+        this.ctx.fillStyle = p.color;
+        this.ctx.beginPath();
+        this.ctx.arc(p.x, p.y, 2.5, 0, Math.PI*2);
+        this.ctx.fill();
+        this.ctx.restore();
+
+        if (p.alpha <= 0) {
+          this.fireworks.splice(idx, 1);
+        }
+      });
     }
-
-    // Update and draw fireworks particles
-    this.fireworks.forEach((p, idx) => {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.08; // gravity on sparks
-      p.alpha -= p.decay;
-
-      this.ctx.save();
-      this.ctx.globalAlpha = p.alpha;
-      this.ctx.fillStyle = p.color;
-      this.ctx.beginPath();
-      this.ctx.arc(p.x, p.y, 2.5, 0, Math.PI*2);
-      this.ctx.fill();
-      this.ctx.restore();
-
-      if (p.alpha <= 0) {
-        this.fireworks.splice(idx, 1);
-      }
-    });
   },
 
   loop() {
@@ -1288,6 +1480,7 @@ const Game = {
 };
 
 // Start the game initialization
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  await initWasm();
   Game.init();
 });

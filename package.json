@@ -4,11 +4,12 @@
   "description": "A 2D side-scrolling birthday memory lane game for Ellen.",
   "main": "index.html",
   "scripts": {
+    "build:wasm": "asc physics.ts -o physics.wasm -O --noAssert",
     "dev": "npx http-server -p 3000 -c-1",
     "start": "npx http-server -p 3000 -c-1"
   },
-  "dependencies": {},
   "devDependencies": {
+    "assemblyscript": "^0.28.19",
     "http-server": "^14.1.1"
   }
 }
