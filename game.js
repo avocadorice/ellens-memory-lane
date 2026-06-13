@@ -474,6 +474,11 @@ const Game = {
   bindUI() {
     // Keyboard inputs
     window.addEventListener('keydown', (e) => {
+      // Keep canvas focused during active gameplay to prevent focus stealing
+      if (this.isRunning && !this.isPaused) {
+        this.canvas.focus();
+      }
+
       // Normalize key identifier for TV browsers
       let code = e.code;
       if (!code) {
@@ -684,6 +689,7 @@ const Game = {
     this.levels.forEach((lvl, idx) => {
       const btn = document.createElement('button');
       btn.className = 'chapter-menu-btn';
+      btn.tabIndex = -1;
       
       const numSpan = document.createElement('span');
       numSpan.className = 'chapter-btn-num';

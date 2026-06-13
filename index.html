@@ -56,7 +56,7 @@
         <button id="start-btn" class="btn primary-btn">Start the Journey</button>
         <div class="audio-toggle-container">
           <label class="switch">
-            <input type="checkbox" id="music-toggle" checked>
+            <input type="checkbox" id="music-toggle" tabindex="-1" checked>
             <span class="slider round"></span>
           </label>
           <span class="audio-label">Play Nostalgic Music 🎵</span>
@@ -75,7 +75,7 @@
           <p id="dialog-text">Loading memory...</p>
         </div>
         <div class="dialog-footer">
-          <button id="dialog-action-btn" class="btn secondary-btn">Continue Walk ➡️</button>
+          <button id="dialog-action-btn" class="btn secondary-btn" tabindex="-1">Continue Walk ➡️</button>
         </div>
       </div>
     </div>
@@ -96,7 +96,7 @@
           </p>
         </div>
 
-        <button id="replay-btn" class="btn primary-btn" style="padding: 12px 30px; font-size: 1.05rem; border-radius: 20px; transition: all 0.3s ease;">Play Again 🔁</button>
+        <button id="replay-btn" class="btn primary-btn" tabindex="-1" style="padding: 12px 30px; font-size: 1.05rem; border-radius: 20px; transition: all 0.3s ease;">Play Again 🔁</button>
       </div>
     </div>
 
@@ -107,7 +107,7 @@
         <div id="chapter-buttons-list" class="chapter-buttons-list">
           <!-- Dynamically populated -->
         </div>
-        <button id="close-menu-btn" class="btn secondary-btn" style="margin-top: 15px; padding: 8px 20px; font-size: 0.9rem;">Close Menu</button>
+        <button id="close-menu-btn" class="btn secondary-btn" tabindex="-1" style="margin-top: 15px; padding: 8px 20px; font-size: 0.9rem;">Close Menu</button>
       </div>
     </div>
 
@@ -120,9 +120,9 @@
 
     <!-- HUD Controls (Visible during gameplay) -->
     <div id="hud-controls">
-      <button id="hud-menu-btn" class="hud-btn" title="Chapters Select">📖</button>
-      <button id="hud-sound-btn" class="hud-btn" title="Mute/Unmute BGM">🔊</button>
-      <button id="hud-dev-btn" class="hud-btn" title="Developer Options">🛠️</button>
+      <button id="hud-menu-btn" class="hud-btn" tabindex="-1" title="Chapters Select">📖</button>
+      <button id="hud-sound-btn" class="hud-btn" tabindex="-1" title="Mute/Unmute BGM">🔊</button>
+      <button id="hud-dev-btn" class="hud-btn" tabindex="-1" title="Developer Options">🛠️</button>
     </div>
 
     <!-- Dev Panel Overlay -->
@@ -134,8 +134,8 @@
       <div class="dev-metric"><span>Cached Sprites:</span><span id="dev-cache-count">0</span></div>
       <div class="dev-metric"><span>Active Particles:</span><span id="dev-particles">0</span></div>
       <div class="dev-metric"><span>Player Pos:</span><span id="dev-player-pos">X: 150, Y: 420</span></div>
-      <button id="dev-toggle-opt-btn" class="btn secondary-btn" style="width: 100%; margin-top: 10px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Toggle Cache/WASM</button>
-      <button id="dev-clear-cache-btn" class="btn secondary-btn" style="width: 100%; margin-top: 5px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Clear Sprite Cache</button>
+      <button id="dev-toggle-opt-btn" class="btn secondary-btn" tabindex="-1" style="width: 100%; margin-top: 10px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Toggle Cache/WASM</button>
+      <button id="dev-clear-cache-btn" class="btn secondary-btn" tabindex="-1" style="width: 100%; margin-top: 5px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Clear Sprite Cache</button>
     </div>
   </div>
 
