@@ -39,12 +39,17 @@ const AudioEngine = {
   schedulerInterval: null,
   nextNoteTime: 0.0,
   beatNumber: 0,
-  scheduleAheadTime: 0.100, // sec
-  lookahead: 25.0, // ms
+  scheduleAheadTime: 1.5, // sec - Large buffer to tolerate TV WebView lag spikes
+  lookahead: 50.0, // ms - Polling check rate
+  activeOscillators: [],
+  startTime: 0.0,
   
   init() {
     try {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // Use playback latencyHint to double the internal audio buffer size for TV browsers
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)({
+        latencyHint: 'playback'
+      });
     } catch (e) {
       console.warn("Web Audio API not supported.", e);
     }
@@ -85,22 +90,35 @@ const AudioEngine = {
       'C5', 'E5', 'G5', 'B5', 'A5', null, 'G5', 'E5'
     ];
 
-    this.nextNoteTime = this.ctx.currentTime;
+    this.startTime = this.ctx.currentTime;
     this.beatNumber = 0;
     const beatLen = 60.0 / this.tempo;
+    this.activeOscillators = [];
 
     this.schedulerInterval = setInterval(() => {
       if (!this.isPlaying) return;
       
-      // Look-ahead schedule loop
-      while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
+      const currentTime = this.ctx.currentTime;
+      const tolerance = 0.150; // 150ms behind window
+
+      // Clock recovery: If main thread froze and we fell too far behind, snap beatNumber forward
+      // to keep it aligned to the absolute beat grid.
+      if (this.startTime + this.beatNumber * beatLen < currentTime - tolerance) {
+        const diff = currentTime - this.startTime;
+        this.beatNumber = Math.ceil(diff / beatLen);
+      }
+
+      // Look-ahead schedule loop (queues up to scheduleAheadTime seconds into the future)
+      while (this.startTime + this.beatNumber * beatLen < currentTime + this.scheduleAheadTime) {
+        const noteTime = this.startTime + this.beatNumber * beatLen;
+
         // Play chords on every measure (4 beats)
         if (this.beatNumber % 4 === 0) {
           const chordIdx = Math.floor(this.beatNumber / 4) % chords.length;
           const chord = chords[chordIdx];
           chord.forEach(noteName => {
             const freq = notes[noteName] || 130.81;
-            this.playSynthNote(freq, this.nextNoteTime, 1.8, 0.03, 'triangle');
+            this.playSynthNote(freq, noteTime, 1.8, 0.03, 'triangle');
           });
         }
 
@@ -108,10 +126,9 @@ const AudioEngine = {
         const melNote = melody[this.beatNumber % melody.length];
         if (melNote) {
           const freq = notes[melNote];
-          this.playSynthNote(freq, this.nextNoteTime, 0.45, 0.05, 'sine');
+          this.playSynthNote(freq, noteTime, 0.45, 0.05, 'sine');
         }
 
-        this.nextNoteTime += beatLen;
         this.beatNumber++;
       }
     }, this.lookahead);
@@ -122,6 +139,16 @@ const AudioEngine = {
     if (this.schedulerInterval) {
       clearInterval(this.schedulerInterval);
       this.schedulerInterval = null;
+    }
+    if (this.activeOscillators) {
+      this.activeOscillators.forEach(osc => {
+        try {
+          osc.stop();
+        } catch (e) {
+          // Ignore already stopped
+        }
+      });
+      this.activeOscillators = [];
     }
   },
 
@@ -142,6 +169,16 @@ const AudioEngine = {
 
     osc.start(startTime);
     osc.stop(startTime + duration);
+
+    if (!this.activeOscillators) {
+      this.activeOscillators = [];
+    }
+    this.activeOscillators.push(osc);
+    osc.onended = () => {
+      if (this.activeOscillators) {
+        this.activeOscillators = this.activeOscillators.filter(o => o !== osc);
+      }
+    };
   },
 
   playJumpSFX() {
