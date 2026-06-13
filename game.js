@@ -324,6 +324,7 @@ const Game = {
     this.player.y = this.height - 80; // Ground height y = 420
     if (wasmExports) {
       wasmExports.initPlayer(this.player.x, this.player.y);
+      wasmExports.initParticles();
     }
 
     // Hook DOM UI events

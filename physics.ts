@@ -174,25 +174,35 @@ export function updateFireworksWasm(): void {
 
 export function getParticleActive(idx: i32): i32 {
   if (idx < 0 || idx >= MAX_PARTICLES) return 0;
-  return particles[idx].active;
+  const p = particles[idx];
+  if (!p) return 0;
+  return p.active;
 }
 
 export function getParticleX(idx: i32): f32 {
   if (idx < 0 || idx >= MAX_PARTICLES) return 0.0;
-  return particles[idx].x;
+  const p = particles[idx];
+  if (!p) return 0.0;
+  return p.x;
 }
 
 export function getParticleY(idx: i32): f32 {
   if (idx < 0 || idx >= MAX_PARTICLES) return 0.0;
-  return particles[idx].y;
+  const p = particles[idx];
+  if (!p) return 0.0;
+  return p.y;
 }
 
 export function getParticleHue(idx: i32): f32 {
   if (idx < 0 || idx >= MAX_PARTICLES) return 0.0;
-  return particles[idx].hue;
+  const p = particles[idx];
+  if (!p) return 0.0;
+  return p.hue;
 }
 
 export function getParticleAlpha(idx: i32): f32 {
   if (idx < 0 || idx >= MAX_PARTICLES) return 0.0;
-  return particles[idx].alpha;
+  const p = particles[idx];
+  if (!p) return 0.0;
+  return p.alpha;
 }
