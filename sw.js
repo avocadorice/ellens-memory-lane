@@ -6,6 +6,7 @@ const ASSETS = [
   './assets.js',
   './levels.js',
   './game.js',
+  './physics.wasm',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',

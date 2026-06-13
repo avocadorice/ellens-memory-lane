@@ -1,7 +1,62 @@
 // Assets procedural rendering module
 const Assets = {
+  _cache: {},
+  noOptimize: null,
+
+  checkOptimize() {
+    if (this.noOptimize === null) {
+      const urlParams = new URLSearchParams(window.location.search);
+      this.noOptimize = urlParams.get('no_optimize') === 'true';
+    }
+    return this.noOptimize;
+  },
+
+  // Helper to get or create cached canvas
+  getCached(key, drawFn, width, height, anchorX, anchorY) {
+    if (this._cache[key]) {
+      return this._cache[key];
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(anchorX, anchorY);
+    drawFn(ctx);
+    this._cache[key] = canvas;
+    return canvas;
+  },
+
+  clearCache() {
+    this._cache = {};
+  },
+
   // Draw Ellen
   drawEllen(ctx, x, y, outfit, frame, dir, scale = 1) {
+    const animFrame = Math.floor(frame) % 24;
+    if (this.checkOptimize()) {
+      this._drawEllenDirect(ctx, x, y, outfit, animFrame, dir, scale);
+      return;
+    }
+    const key = `ellen_${outfit}_${animFrame}_${scale}`;
+    const cachedCanvas = this.getCached(
+      key,
+      (offscreenCtx) => {
+        this._drawEllenDirect(offscreenCtx, 0, 0, outfit, animFrame, 1, 1);
+      },
+      80,
+      110,
+      40,
+      95
+    );
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    ctx.drawImage(cachedCanvas, -40, -95);
+    ctx.restore();
+  },
+
+  _drawEllenDirect(ctx, x, y, outfit, frame, dir, scale = 1) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir * scale, scale);
@@ -215,6 +270,31 @@ const Assets = {
 
   // Draw Husband (Partnership milestones)
   drawHusband(ctx, x, y, outfit, frame, dir, scale = 1) {
+    const animFrame = Math.floor(frame) % 24;
+    if (this.checkOptimize()) {
+      this._drawHusbandDirect(ctx, x, y, outfit, animFrame, dir, scale);
+      return;
+    }
+    const key = `husband_${outfit}_${animFrame}_${scale}`;
+    const cachedCanvas = this.getCached(
+      key,
+      (offscreenCtx) => {
+        this._drawHusbandDirect(offscreenCtx, 0, 0, outfit, animFrame, 1, 1);
+      },
+      80,
+      110,
+      40,
+      95
+    );
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    ctx.drawImage(cachedCanvas, -40, -95);
+    ctx.restore();
+  },
+
+  _drawHusbandDirect(ctx, x, y, outfit, frame, dir, scale = 1) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir * scale, scale);
@@ -387,6 +467,31 @@ const Assets = {
 
   // Draw Dog
   drawDog(ctx, x, y, frame, dir, scale = 0.75) {
+    const animFrame = Math.floor(frame) % 24;
+    if (this.checkOptimize()) {
+      this._drawDogDirect(ctx, x, y, animFrame, dir, scale);
+      return;
+    }
+    const key = `dog_${animFrame}_${scale}`;
+    const cachedCanvas = this.getCached(
+      key,
+      (offscreenCtx) => {
+        this._drawDogDirect(offscreenCtx, 0, 0, animFrame, 1, 1);
+      },
+      80,
+      80,
+      40,
+      70
+    );
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir * scale, scale);
+    ctx.drawImage(cachedCanvas, -40, -70);
+    ctx.restore();
+  },
+
+  _drawDogDirect(ctx, x, y, frame, dir, scale = 0.75) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir * scale, scale);
@@ -500,6 +605,31 @@ const Assets = {
 
   // Draw Toddler / Kids
   drawKid(ctx, x, y, type, frame, dir, lvlIdx = 9) {
+    const animFrame = Math.floor(frame) % 24;
+    if (this.checkOptimize()) {
+      this._drawKidDirect(ctx, x, y, type, animFrame, dir, lvlIdx);
+      return;
+    }
+    const key = `kid_${type}_${animFrame}_${lvlIdx}`;
+    const cachedCanvas = this.getCached(
+      key,
+      (offscreenCtx) => {
+        this._drawKidDirect(offscreenCtx, 0, 0, type, animFrame, 1, lvlIdx);
+      },
+      110,
+      110,
+      55,
+      95
+    );
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    ctx.drawImage(cachedCanvas, -55, -95);
+    ctx.restore();
+  },
+
+  _drawKidDirect(ctx, x, y, type, frame, dir, lvlIdx = 9) {
     let scale = 0.6;
     if (type === 'kid1') {
       scale = (lvlIdx >= 8) ? 0.78 : 0.55; // Preston grows taller when Blaire starts walking in Level 9 & 10!
@@ -919,6 +1049,54 @@ const Assets = {
 
   // Draw Background Parallax Scenery
   drawScenery(ctx, levelId, stageX, time) {
+    if (this.checkOptimize()) {
+      this._drawSceneryDirect(ctx, levelId, stageX, time);
+      return;
+    }
+    if (levelId === 10) {
+      const fujiKey = `fuji_scenery`;
+      const cachedFuji = this.getCached(
+        fujiKey,
+        (offscreenCtx) => {
+          this.drawFuji(offscreenCtx, 0, 0, 680, 370);
+        },
+        720,
+        380,
+        360,
+        370
+      );
+
+      ctx.save();
+      ctx.translate(stageX, 420);
+      ctx.drawImage(cachedFuji, -360, -370);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(0, 420);
+      this.drawCherryBranch(ctx, stageX - 120, -260, time);
+      ctx.restore();
+      return;
+    }
+
+    const key = `scenery_${levelId}`;
+    const cachedScenery = this.getCached(
+      key,
+      (offscreenCtx) => {
+        this._drawSceneryDirect(offscreenCtx, levelId, 0, 0);
+      },
+      400,
+      280,
+      200,
+      250
+    );
+
+    ctx.save();
+    ctx.translate(stageX, 420);
+    ctx.drawImage(cachedScenery, -200, -250);
+    ctx.restore();
+  },
+
+  _drawSceneryDirect(ctx, levelId, stageX, time) {
     ctx.save();
     ctx.translate(0, 420); // Translate to ground level (y = 420)
 
@@ -1721,6 +1899,19 @@ const Assets = {
   drawPolaroid(ctx, x, y, level, alpha, time) {
     if (alpha <= 0.01) return;
 
+    if (this.checkOptimize()) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x, y);
+      const floatY = Math.sin(time * 0.002 + level.id) * 6;
+      const rotateAngle = Math.sin(time * 0.0012 + level.id) * 0.04 - 0.02;
+      ctx.translate(0, floatY);
+      ctx.rotate(rotateAngle);
+      this._drawPolaroidDirect(ctx, 0, 0, level, 1, 0);
+      ctx.restore();
+      return;
+    }
+
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(x, y);
@@ -1730,6 +1921,31 @@ const Assets = {
     const rotateAngle = Math.sin(time * 0.0012 + level.id) * 0.04 - 0.02; // osc between -3 and +1 degs
     ctx.translate(0, floatY);
     ctx.rotate(rotateAngle);
+
+    const hasImage = !!(level.imgElement && level.imgElement.complete && level.imgElement.naturalWidth > 0);
+    const key = `polaroid_${level.id}_${hasImage}`;
+
+    const cachedCanvas = this.getCached(
+      key,
+      (offscreenCtx) => {
+        this._drawPolaroidDirect(offscreenCtx, 0, 0, level, 1, 0);
+      },
+      160,
+      185,
+      80,
+      90
+    );
+
+    ctx.drawImage(cachedCanvas, -80, -90);
+    ctx.restore();
+  },
+
+  _drawPolaroidDirect(ctx, x, y, level, alpha, time) {
+    if (alpha <= 0.01) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
 
     const cardW = 120;
     const cardH = 145;

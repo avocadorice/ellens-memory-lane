@@ -18,8 +18,9 @@ A beautiful, interactive, and personalized 2D HTML5 Canvas side-scrolling game b
   10. **Mt. Fuji (2026)** - Standing together at sunrise in Japan.
 - **Growing Family Train:** As milestones are unlocked, Ellen's husband, their dog, and their two children join the walk train behind her, walking and jumping along!
 - **Dynamic Sky Interpolation:** The sky colors smoothly blend and transition as she walks, moving from morning blue to mid-day sunshine, sunset glow, starry night skies, and a gorgeous sunrise over Mt. Fuji.
+- **WebAssembly Physics Engine:** Player movement physics, jumps, boundaries, heart/hurdle collision detection, and ending screen celebration fireworks particles are calculated in high-performance WebAssembly for absolute performance scaling.
+- **Robust JS Fallback:** If the WebAssembly binary fails to load or stream for any reason, the engine falls back to standard JS calculation loops with zero gameplay impact.
 - **Procedural Synthesizer & Sound Effects:** Music and SFX are generated dynamically using the **Web Audio API**—meaning zero lag, zero external asset loading, and a nostalgic 8-bit/chime feel that plays a lovely melody in the background.
-- **The Birthday Challenge & Gift Reveal:** Reaching Mt. Fuji triggers a fun 3-question trivia challenge about their memories, followed by a shaking gift box. Clicking it pops open to reveal a real getaway ticket to Japan!
 
 ---
 
@@ -27,7 +28,9 @@ A beautiful, interactive, and personalized 2D HTML5 Canvas side-scrolling game b
 
 * `index.html` - Game structure, preloader screen, overlays, and virtual controller buttons.
 * `styles.css` - Premium glassmorphic UI overlay panels, animations, and custom font styling.
-* `game.js` - Main game engine, canvas graphics rendering pipeline, input handlers, companion trailing offset logic, collision detection, and procedural music generator.
+* `game.js` - Main game engine, canvas graphics rendering pipeline, input handlers, companion trailing offset logic, and procedural music generator. Coordinates with the WASM engine.
+* `physics.ts` - AssemblyScript source code for the WebAssembly physics, collision, and particle calculations.
+* `physics.wasm` - Compiled WebAssembly binary loaded dynamically by the game.
 * `assets.js` - Procedural 2D path rendering canvas assets for all character animations, background houses, camper, and Mt. Fuji scenery.
 * `levels.js` - Configuration of coordinates, years, sky gradient colors, dialogues, and trivia questions.
 
@@ -39,9 +42,16 @@ A beautiful, interactive, and personalized 2D HTML5 Canvas side-scrolling game b
 2. In your terminal, run:
    ```bash
    npm install
+   ```
+3. (Optional) Compile the WebAssembly module if you edit the AssemblyScript (`physics.ts`):
+   ```bash
+   npm run build:wasm
+   ```
+4. Start the development server:
+   ```bash
    npm run dev
    ```
-3. Open your browser and navigate to:
+5. Open your browser and navigate to:
    ```
    http://127.0.0.1:3000
    ```
