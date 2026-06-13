@@ -741,3 +741,38 @@ input:checked + .slider:before {
 #gameCanvas {
   outline: none;
 }
+
+/* Developer Options Metrics Panel Overlay */
+.dev-panel {
+  position: absolute;
+  top: 75px;
+  right: 20px;
+  width: 210px;
+  padding: 14px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.8rem;
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+.dev-panel.active {
+  display: flex;
+}
+.dev-metric {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+}
+.dev-metric span:first-child {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+.dev-metric span:last-child {
+  font-family: monospace;
+  font-weight: bold;
+}
