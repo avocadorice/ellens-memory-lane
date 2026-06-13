@@ -474,11 +474,6 @@ const Game = {
   bindUI() {
     // Keyboard inputs
     window.addEventListener('keydown', (e) => {
-      // Keep canvas focused during active gameplay to prevent focus stealing
-      if (this.isRunning && !this.isPaused) {
-        this.canvas.focus();
-      }
-
       // Normalize key identifier for TV browsers
       let code = e.code;
       if (!code) {
