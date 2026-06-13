@@ -621,6 +621,7 @@ const Game = {
         AudioEngine.playBGM();
         document.getElementById('hud-sound-btn').innerText = '🔊';
       }
+      this.canvas.focus();
     });
 
     // Chapter Select HUD button
@@ -630,11 +631,13 @@ const Game = {
 
     document.getElementById('close-menu-btn').addEventListener('click', () => {
       document.getElementById('chapter-menu-overlay').classList.remove('active');
+      this.canvas.focus();
     });
 
     document.getElementById('chapter-menu-overlay').addEventListener('click', (e) => {
       if (e.target.id === 'chapter-menu-overlay') {
         document.getElementById('chapter-menu-overlay').classList.remove('active');
+        this.canvas.focus();
       }
     });
 
@@ -676,6 +679,7 @@ const Game = {
         devPanel.classList.toggle('active');
         this.updateDevPanel();
       }
+      this.canvas.focus();
     });
 
     // Dev Panel toggle optimizations
@@ -685,12 +689,14 @@ const Game = {
       Game.useWasm = !nextState;
       Assets.clearCache();
       this.updateDevPanel();
+      this.canvas.focus();
     });
 
     // Dev Panel clear cache
     document.getElementById('dev-clear-cache-btn').addEventListener('click', () => {
       Assets.clearCache();
       this.updateDevPanel();
+      this.canvas.focus();
     });
 
     // Mobile buttons touch bindings
@@ -1126,6 +1132,7 @@ const Game = {
       document.getElementById('dialog-overlay').classList.remove('active');
       this.isPaused = false;
       this.activeDialog = null;
+      this.canvas.focus();
 
       // If they reached the end (Fuji milestone)
       if (this.currentLevelIndex === this.levels.length - 1) {
