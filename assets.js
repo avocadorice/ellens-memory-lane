@@ -1040,6 +1040,29 @@ const Assets = {
         ctx.closePath();
         ctx.fill();
         break;
+      case 11: // Started Dating: Bouquet of roses
+        // Stems
+        ctx.strokeStyle = '#2e7d32';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(-6, -14);
+        ctx.moveTo(0, 0); ctx.lineTo(0, -16);
+        ctx.moveTo(0, 0); ctx.lineTo(6, -14);
+        ctx.stroke();
+        // Roses
+        ctx.fillStyle = '#ff477e';
+        [[-6, -16], [0, -18], [6, -16]].forEach(p => {
+          ctx.beginPath();
+          ctx.arc(p[0], p[1], 5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        // Paper wrap
+        ctx.fillStyle = '#ffd6e0';
+        ctx.beginPath();
+        ctx.moveTo(-7, -2); ctx.lineTo(7, -2); ctx.lineTo(4, -12); ctx.lineTo(-4, -12);
+        ctx.closePath();
+        ctx.fill();
+        break;
       default:
         break;
     }
@@ -1277,6 +1300,38 @@ const Assets = {
         this.drawFuji(ctx, stageX, 0, 680, 370); // Larger and more majestic!
         // Cherry blossoms branch framing the view
         this.drawCherryBranch(ctx, stageX - 120, -260, time);
+        break;
+
+      case 11: // Started Dating: Park bench under a blossom tree
+        // Tree trunk
+        ctx.fillStyle = '#8b5a2b';
+        ctx.fillRect(stageX - 60, -78, 10, 78);
+        // Blossom canopy
+        ctx.fillStyle = '#ffc8dd';
+        [[-55, -86, 26], [-72, -72, 20], [-38, -72, 20], [-55, -60, 16]].forEach(c => {
+          ctx.beginPath();
+          ctx.arc(stageX + c[0], c[1], c[2], 0, Math.PI * 2);
+          ctx.fill();
+        });
+        // Park bench
+        ctx.fillStyle = '#6b4f3a';
+        ctx.fillRect(stageX + 6, -24, 72, 6);   // seat
+        ctx.fillRect(stageX + 8, -46, 72, 5);   // backrest
+        ctx.fillRect(stageX + 12, -24, 5, 24);  // front legs
+        ctx.fillRect(stageX + 71, -24, 5, 24);
+        ctx.fillRect(stageX + 12, -46, 4, 22);  // back supports
+        ctx.fillRect(stageX + 72, -46, 4, 22);
+        // Floating hearts
+        ctx.fillStyle = '#ff5d8f';
+        [[-8, -96], [22, -110], [-30, -116]].forEach(h => {
+          const hy = h[1] + Math.sin(time + h[0]) * 4;
+          ctx.beginPath();
+          ctx.arc(stageX + h[0] - 4, hy, 4, Math.PI, 0);
+          ctx.arc(stageX + h[0] + 4, hy, 4, Math.PI, 0);
+          ctx.lineTo(stageX + h[0], hy + 8);
+          ctx.closePath();
+          ctx.fill();
+        });
         break;
 
       default:
@@ -2218,6 +2273,19 @@ const Assets = {
         ctx.arc(0, 0, 3.5, 0, Math.PI*2);
         ctx.fill();
         ctx.stroke();
+        break;
+
+      case 11: // Started Dating: Two hearts
+        [[-6, -6, 16, '#ff477e'], [7, 1, 13, '#ff7096']].forEach(p => {
+          ctx.fillStyle = p[3];
+          ctx.beginPath();
+          ctx.arc(p[0] - p[2] / 2, p[1], p[2] / 2, Math.PI, 0);
+          ctx.arc(p[0] + p[2] / 2, p[1], p[2] / 2, Math.PI, 0);
+          ctx.lineTo(p[0], p[1] + p[2]);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        });
         break;
 
       default:

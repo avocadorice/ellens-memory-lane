@@ -1,10 +1,37 @@
 // Levels/Milestones configuration data
+//
+// NOTE: `id` is the *scene identity* (drives hurdle/scenery/icon art in assets.js,
+// all keyed by id). It is intentionally NOT the same as array position. The array
+// ORDER is the chronological walking sequence; `x` spaces the milestones along the
+// path. When reordering milestones, keep each one's `id` so its art follows it.
 const levelsData = [
+  {
+    id: 11,
+    name: "Started Dating",
+    year: "May 2012",
+    x: 800,
+    photo: "photos/0_dating.jpg",
+    skyGradient: {
+      top: "#ffecd2",
+      bottom: "#fcb69f"
+    },
+    groundColor: "#9ec96f",
+    dialogue: [
+      "Where it all began 💕",
+      "May 2012 — a nervous first date, butterflies, and the very start of our story.",
+      "Neither of us knew it yet, but this was step one of a lifelong adventure together."
+    ],
+    quiz: {
+      question: "Which milestone came first in our adventure timeline?",
+      options: ["Started dating", "Graduation", "Adopting Mochi", "Our first home"],
+      answer: "Started dating"
+    }
+  },
   {
     id: 1,
     name: "Graduation",
-    year: "2012",
-    x: 800,
+    year: "June 2012",
+    x: 2000,
     photo: "photos/1_graduation.jpg",
     skyGradient: {
       top: "#a1c4fd",
@@ -17,16 +44,16 @@ const levelsData = [
       "This was the launchpad of so many amazing things to come. You made it look easy!"
     ],
     quiz: {
-      question: "Which milestone came first in our adventure timeline?",
-      options: ["Adopting Mochi", "Graduation", "First house", "RV Camping"],
+      question: "What did we celebrate in June 2012?",
+      options: ["Engagement", "Graduation", "Wedding", "First home"],
       answer: "Graduation"
     }
   },
   {
     id: 2,
     name: "Adopting Mochi",
-    year: "2014",
-    x: 2000,
+    year: "July 2012",
+    x: 3200,
     photo: "photos/2_mochi.jpg",
     skyGradient: {
       top: "#89f7fe",
@@ -45,10 +72,32 @@ const levelsData = [
     }
   },
   {
+    id: 5,
+    name: "Our First Home",
+    year: "December 2016",
+    x: 4400,
+    photo: "photos/5_first_home.jpg",
+    skyGradient: {
+      top: "#fbc2eb",
+      bottom: "#a6c1ee"
+    },
+    groundColor: "#416726",
+    dialogue: [
+      "Our First Home! 🔑🏠",
+      "Cardboard boxes stacked to the ceiling, eating takeout pizza sitting on the living room floor.",
+      "It didn't matter—it was ours, and it quickly filled with warmth and dreams."
+    ],
+    quiz: {
+      question: "What was the landmark milestone we hit in 2016?",
+      options: ["Adopting Mochi", "Moving to our 2nd house", "Getting married", "Our first home together"],
+      answer: "Our first home together"
+    }
+  },
+  {
     id: 3,
     name: "The Engagement",
-    year: "2016",
-    x: 3200,
+    year: "March 2018",
+    x: 5600,
     photo: "photos/3_engagement.jpg",
     skyGradient: {
       top: "#fddb92",
@@ -62,15 +111,15 @@ const levelsData = [
     ],
     quiz: {
       question: "What year did we get engaged?",
-      options: ["2015", "2016", "2017", "2018"],
-      answer: "2016"
+      options: ["2016", "2017", "2018", "2019"],
+      answer: "2018"
     }
   },
   {
     id: 4,
     name: "Our Wedding Day",
-    year: "2017",
-    x: 4400,
+    year: "October 2018",
+    x: 6800,
     photo: "photos/4_wedding.jpg",
     skyGradient: {
       top: "#ff9a9e",
@@ -84,37 +133,15 @@ const levelsData = [
     ],
     quiz: {
       question: "We danced under a beautiful sky at our wedding. What year did we tie the knot?",
-      options: ["2016", "2017", "2018", "2019"],
-      answer: "2017"
-    }
-  },
-  {
-    id: 5,
-    name: "Our First Home",
-    year: "2018",
-    x: 5600,
-    photo: "photos/5_first_home.jpg",
-    skyGradient: {
-      top: "#fbc2eb",
-      bottom: "#a6c1ee"
-    },
-    groundColor: "#416726",
-    dialogue: [
-      "Our First Home! 🔑🏠",
-      "Cardboard boxes stacked to the ceiling, eating takeout pizza sitting on the living room floor.",
-      "It didn't matter—it was ours, and it quickly filled with warmth and dreams."
-    ],
-    quiz: {
-      question: "What was the landmark milestone we hit in 2018?",
-      options: ["Adopting Mochi", "Moving to our 2nd house", "Getting married", "Our first home together"],
-      answer: "Our first home together"
+      options: ["2017", "2018", "2019", "2020"],
+      answer: "2018"
     }
   },
   {
     id: 6,
     name: "Welcoming Preston",
-    year: "2020",
-    x: 6800,
+    year: "July 2019",
+    x: 8000,
     photo: "photos/6_preston.jpg",
     skyGradient: {
       top: "#b1f2ff",
@@ -123,11 +150,11 @@ const levelsData = [
     groundColor: "#598935",
     dialogue: [
       "Hello, Preston! 🍼👶",
-      "Welcoming our baby boy, Preston, into the world in 2020. Our lives changed forever.",
+      "Welcoming our baby boy, Preston, into the world in the summer of 2019. Our lives changed forever.",
       "You became a mom, I became a dad, and we fell completely in love with our beautiful boy."
     ],
     quiz: {
-      question: "What is the name of our first child, born in 2020?",
+      question: "What is the name of our first child, born in 2019?",
       options: ["Peter", "Parker", "Preston", "Patrick"],
       answer: "Preston"
     }
@@ -135,8 +162,8 @@ const levelsData = [
   {
     id: 7,
     name: "Moving to Our Second House",
-    year: "2021",
-    x: 8000,
+    year: "October 2020",
+    x: 9200,
     photo: "photos/7_second_home.jpg",
     skyGradient: {
       top: "#30cfd0",
@@ -157,8 +184,8 @@ const levelsData = [
   {
     id: 8,
     name: "Welcoming Blaire",
-    year: "2023",
-    x: 9200,
+    year: "August 2024",
+    x: 10400,
     photo: "photos/8_blaire.jpg",
     skyGradient: {
       top: "#1a1c4b",
@@ -171,7 +198,7 @@ const levelsData = [
       "Preston is running around while baby Blaire crawls and giggles. The house is full of life!"
     ],
     quiz: {
-      question: "What is the name of our daughter, born in 2023?",
+      question: "What is the name of our daughter, born in 2024?",
       options: ["Bella", "Blaire", "Bianca", "Brooke"],
       answer: "Blaire"
     }
@@ -180,7 +207,7 @@ const levelsData = [
     id: 9,
     name: "RV Camping Adventures",
     year: "2025",
-    x: 10400,
+    x: 11600,
     photo: "photos/9_camping.jpg",
     skyGradient: {
       top: "#0f172a",
@@ -202,7 +229,7 @@ const levelsData = [
     id: 10,
     name: "The Family at Mt. Fuji",
     year: "2026",
-    x: 11600,
+    x: 12800,
     photo: "photos/10_fuji.jpg",
     skyGradient: {
       top: "#ff7e5f",

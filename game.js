@@ -303,7 +303,7 @@ const Game = {
     gravity: 0.7,
     jumpForce: -13,
     isGrounded: false,
-    outfit: 'graduation', // 'graduation', 'wedding', 'casual', 'hiking'
+    outfit: 'casual', // 'graduation', 'wedding', 'casual', 'hiking'
     animFrame: 0,
     dir: 1
   },
@@ -438,8 +438,8 @@ const Game = {
 
         // Chance of obstacle hurdle below it
         if (Math.random() > 0.4) {
-          // Identify corresponding level ID for asset drawing
-          const activeLvl = this.getLevelIndexAtX(x) + 1;
+          // Use the milestone's scene id (not its position) so hurdle art matches scenery
+          const activeLvl = this.levels[this.getLevelIndexAtX(x)].id;
           this.hurdles.push({
             x: x + 20,
             y: this.height - 80,
@@ -502,16 +502,16 @@ const Game = {
 
     // Force updates of outfits and companions
     const frame = this.player.animFrame;
-    if (lvlIndex === 0) {
+    if (lvlIndex === 1) {
       this.player.outfit = 'graduation';
-    } else if (lvlIndex === 3) {
+    } else if (lvlIndex === 5) {
       this.player.outfit = 'wedding';
-    } else if (lvlIndex >= 4 && lvlIndex <= 7) {
-      this.player.outfit = 'casual';
-    } else if (lvlIndex >= 8) {
+    } else if (lvlIndex >= 9) {
       this.player.outfit = 'hiking';
+    } else {
+      this.player.outfit = 'casual';
     }
-    
+
     this.updateCompanions(lvlIndex);
 
     // Chime BGM effect
@@ -881,13 +881,13 @@ const Game = {
       this.player.isGrounded = wasmExports.player_isGrounded.value !== 0;
       this.player.dir = wasmExports.player_dir.value;
       this.player.animFrame = wasmExports.player_animFrame.value;
-      this.player.outfit = 'graduation';
+      this.player.outfit = 'casual';
     } else {
       this.player.x = 150;
       this.player.y = this.height - 80;
       this.player.vx = 0;
       this.player.vy = 0;
-      this.player.outfit = 'graduation';
+      this.player.outfit = 'casual';
     }
     this.camera.x = 0;
     this.currentLevelIndex = 0;
@@ -1030,14 +1030,14 @@ const Game = {
 
     // Set Ellen's outfit based on current level milestone reached
     const lvlIdx = this.getLevelIndexAtX(this.player.x);
-    if (lvlIdx === 0) {
+    if (lvlIdx === 1) {
       this.player.outfit = 'graduation';
-    } else if (lvlIdx === 3) {
+    } else if (lvlIdx === 5) {
       this.player.outfit = 'wedding';
-    } else if (lvlIdx >= 4 && lvlIdx <= 7) {
-      this.player.outfit = 'casual';
-    } else if (lvlIdx >= 8) {
+    } else if (lvlIdx >= 9) {
       this.player.outfit = 'hiking';
+    } else {
+      this.player.outfit = 'casual';
     }
 
     // --- COMPANION TRAIL ENGINE ---
@@ -1110,8 +1110,8 @@ const Game = {
     const speed = Math.abs(this.player.vx);
     const isMoving = speed > 0.5;
 
-    // 1. Dog joins at Level 2+
-    if (lvlIdx >= 1) {
+    // 1. Dog joins once we've adopted Mochi (index 2) onward
+    if (lvlIdx >= 2) {
       this.companions.push({
         type: 'dog',
         x: this.player.x - 55 * this.player.dir,
@@ -1122,11 +1122,11 @@ const Game = {
       });
     }
 
-    // 2. Husband joins at Level 4+ (Wedding)
-    if (lvlIdx >= 3) {
+    // 2. Husband joins at the Wedding milestone (index 5) onward
+    if (lvlIdx >= 5) {
       let husbandOutfit = 'casual';
-      if (lvlIdx === 3) husbandOutfit = 'tuxedo';
-      if (lvlIdx >= 8) husbandOutfit = 'hiking';
+      if (lvlIdx === 5) husbandOutfit = 'tuxedo';
+      if (lvlIdx >= 9) husbandOutfit = 'hiking';
 
       this.companions.push({
         type: 'husband',
@@ -1138,11 +1138,11 @@ const Game = {
       });
     }
 
-    // 3. Child 1 joins at Level 6 (Baby stroller) or Level 7+ (Toddler walking)
-    if (lvlIdx >= 5) {
+    // 3. Child 1 (Preston) joins at his birth (index 6, baby stroller), toddler from the next milestone
+    if (lvlIdx >= 6) {
       let kidType = 'baby_stroller';
       let offset = 85;
-      if (lvlIdx >= 6) {
+      if (lvlIdx >= 7) {
         kidType = 'kid1';
         offset = 90;
       }
@@ -1157,13 +1157,13 @@ const Game = {
       });
     }
 
-    // 4. Child 2 (Blaire) joins at Level 8+ (making family of 4)
-    if (lvlIdx >= 7) {
-      let kid2Type = 'baby_crawling'; // crawling baby in Level 8 (lvlIdx == 7)
+    // 4. Child 2 (Blaire) joins at her birth (index 8, crawling baby), toddler from the next milestone
+    if (lvlIdx >= 8) {
+      let kid2Type = 'baby_crawling';
       let offset = 115;
-      
-      if (lvlIdx >= 8) {
-        kid2Type = 'kid2'; // walking toddler in Level 9 & 10 (lvlIdx >= 8)
+
+      if (lvlIdx >= 9) {
+        kid2Type = 'kid2';
         offset = 120;
       }
 
@@ -1261,9 +1261,9 @@ const Game = {
     this.ctx.fillStyle = bgGrad;
     this.ctx.fillRect(0, 0, this.width, this.height);
 
-    // Dynamic Stars / Sun/Moon depending on levels (e.g. Levels 7, 8, 9 are night)
+    // Dynamic Stars depending on levels (Blaire idx 8 and RV idx 9 are the night milestones)
     const lvlIdx = this.getLevelIndexAtX(this.player.x);
-    if (lvlIdx >= 7 && lvlIdx <= 8) {
+    if (lvlIdx >= 8 && lvlIdx <= 9) {
       // Draw stars twinkling
       this.ctx.fillStyle = '#ffffff';
       const time = Date.now() * 0.002;
@@ -1314,7 +1314,7 @@ const Game = {
     if (urlParams.get('no_optimize') === 'true') {
       // Old dynamic drawing loops
       // Far hills (Slowest scroll speed: 0.15)
-      this.ctx.fillStyle = lvlIdx >= 7 ? '#0b1626' : (lvlIdx >= 4 ? '#2b442b' : '#32531d');
+      this.ctx.fillStyle = lvlIdx >= 8 ? '#0b1626' : (lvlIdx >= 7 ? '#2b442b' : '#32531d');
       this.ctx.beginPath();
       this.ctx.moveTo(0, this.height - 80);
       for (let x = 0; x <= this.width; x += 30) {
@@ -1327,7 +1327,7 @@ const Game = {
       this.ctx.fill();
 
       // Mid hills (Medium scroll speed: 0.3)
-      this.ctx.fillStyle = lvlIdx >= 7 ? '#122538' : (lvlIdx >= 4 ? '#385838' : '#47752b');
+      this.ctx.fillStyle = lvlIdx >= 8 ? '#122538' : (lvlIdx >= 7 ? '#385838' : '#47752b');
       this.ctx.beginPath();
       this.ctx.moveTo(0, this.height - 80);
       for (let x = 0; x <= this.width; x += 30) {
@@ -1342,7 +1342,7 @@ const Game = {
     }
 
     // Determine color state (0, 1, 2)
-    const state = lvlIdx >= 7 ? 2 : (lvlIdx >= 4 ? 1 : 0);
+    const state = lvlIdx >= 8 ? 2 : (lvlIdx >= 7 ? 1 : 0);
     
     // Lazy render far hills
     const farKey = `far_hills_${state}`;
