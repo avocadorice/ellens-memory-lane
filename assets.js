@@ -31,10 +31,12 @@ const Assets = {
   },
 
   // Draw Ellen
-  drawEllen(ctx, x, y, outfit, frame, dir, scale = 1) {
+  drawEllen(ctx, x, y, outfit, frame, dir, scale = 1, shout = false) {
     const animFrame = Math.floor(frame) % 24;
-    if (this.checkOptimize()) {
-      this._drawEllenDirect(ctx, x, y, outfit, animFrame, dir, scale);
+    // Shouting (open mouth) is a brief, transient state — draw it directly
+    // rather than minting cache entries for it.
+    if (shout || this.checkOptimize()) {
+      this._drawEllenDirect(ctx, x, y, outfit, animFrame, dir, scale, shout);
       return;
     }
     const key = `ellen_${outfit}_${animFrame}_${scale}`;
@@ -56,7 +58,7 @@ const Assets = {
     ctx.restore();
   },
 
-  _drawEllenDirect(ctx, x, y, outfit, frame, dir, scale = 1) {
+  _drawEllenDirect(ctx, x, y, outfit, frame, dir, scale = 1, shout = false) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir * scale, scale);
@@ -298,12 +300,20 @@ const Assets = {
     ctx.arc(11, -55 + bounce * 0.5, 2.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Smiling mouth
-    ctx.strokeStyle = '#1e1e2f';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(7, -54 + bounce * 0.5, 3, 0.1, Math.PI - 0.1);
-    ctx.stroke();
+    if (shout) {
+      // Open "Aya!" mouth mid karate chop
+      ctx.fillStyle = '#7a1f2b';
+      ctx.beginPath();
+      ctx.ellipse(7, -52 + bounce * 0.5, 2.6, 3.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Smiling mouth
+      ctx.strokeStyle = '#1e1e2f';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(7, -54 + bounce * 0.5, 3, 0.1, Math.PI - 0.1);
+      ctx.stroke();
+    }
 
     // --- ACCESSORIES / HEADWEAR ---
     if (outfit === 'graduation') {
@@ -3105,6 +3115,83 @@ const Assets = {
     ctx.beginPath();
     ctx.arc(0, 0, 52, -0.45, 0.45);
     ctx.stroke();
+    ctx.restore();
+  },
+
+  // Karate chop: a quick fist thrust forward with an impact burst.
+  // progress 0..1 — fist punches out, then the impact star pops.
+  drawKarateChop(ctx, x, y, dir, progress) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    // Fist thrust distance (eases out then settles)
+    const reach = Math.sin(Math.min(1, progress) * Math.PI) * 18 + 8;
+    // Forearm
+    ctx.strokeStyle = '#f0b890';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-2, 2);
+    ctx.lineTo(reach - 6, 0);
+    ctx.stroke();
+    // Fist
+    ctx.fillStyle = '#f6c39e';
+    ctx.beginPath();
+    ctx.arc(reach, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    // Impact burst (strongest mid-punch)
+    const burst = Math.sin(Math.min(1, progress) * Math.PI);
+    if (burst > 0.25) {
+      ctx.globalAlpha = burst;
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const r1 = 7, r2 = 7 + 7 * burst;
+        ctx.beginPath();
+        ctx.moveTo(reach + Math.cos(a) * r1, Math.sin(a) * r1);
+        ctx.lineTo(reach + Math.cos(a) * r2, Math.sin(a) * r2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  },
+
+  // Small comic speech bubble with a tail, e.g. Ellen's "Aya!" karate shout.
+  drawSpeechBubble(ctx, x, y, text) {
+    ctx.save();
+    ctx.font = '700 13px Outfit';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const padX = 9, h = 22;
+    const w = Math.max(34, ctx.measureText(text).width + padX * 2);
+    const rx = x - w / 2, ry = y - h / 2, r = 8;
+    // Bubble body
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.strokeStyle = '#1e1e2f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(rx + r, ry);
+    ctx.arcTo(rx + w, ry, rx + w, ry + h, r);
+    ctx.arcTo(rx + w, ry + h, rx, ry + h, r);
+    ctx.arcTo(rx, ry + h, rx, ry, r);
+    ctx.arcTo(rx, ry, rx + w, ry, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Tail pointing down toward Ellen
+    ctx.beginPath();
+    ctx.moveTo(x - 5, ry + h - 1);
+    ctx.lineTo(x - 1, ry + h + 7);
+    ctx.lineTo(x + 5, ry + h - 1);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.fill();
+    ctx.strokeStyle = '#1e1e2f';
+    ctx.stroke();
+    // Text
+    ctx.fillStyle = '#d23b5a';
+    ctx.fillText(text, x, ry + h / 2 + 1);
     ctx.restore();
   },
 

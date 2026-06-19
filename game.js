@@ -436,11 +436,13 @@ const Game = {
     animFrame: 0,
     dir: 1,
     // --- Combat state ---
-    weapon: null,      // null | 'racket'
+    weapon: null,      // null = bare-hand karate | 'racket'
     hasBalls: false,   // unlocked by tennis-ball pickup → swing also serves an arcing ball
     health: 5,
     maxHealth: 5,
-    attackTimer: 0,    // counts down during a racket swing
+    attackTimer: 0,    // counts down during a swing/chop
+    attackType: 'karate', // 'karate' (short reach) | 'racket' (longer reach)
+    attackMax: 12,     // frames the current attack lasts (for render normalization)
     serveCooldown: 0,  // counts down between served tennis balls
     invuln: 0,         // i-frames after taking damage
     isDead: false
@@ -449,7 +451,14 @@ const Game = {
   // Combat tuning constants
   combat: {
     swingDuration: 16,   // frames a racket swing stays active
-    swingReach: 60,      // px in front of player a swing hits
+    swingReach: 60,      // px in front of player a racket swing hits
+    karateDuration: 12,  // frames a karate chop stays active (snappier)
+    karateReach: 36,     // px in front — shorter reach than the racket
+    serveCooldown: 20,   // frames between served tennis balls
+    ballSpeedX: 8.5,     // arcing tennis-ball launch (horizontal)
+    ballSpeedY: -10,     // arcing tennis-ball launch (upward)
+    ballGravity: 0.4,    // gravity pulling the ball back down (the arc)
+    invulnFrames: 70,    // i-frames after a hit (~1.1s)
     serveCooldown: 20,   // frames between served tennis balls
     ballSpeedX: 8.5,     // arcing tennis-ball launch (horizontal)
     ballSpeedY: -10,     // arcing tennis-ball launch (upward)
@@ -483,7 +492,8 @@ const Game = {
   bossDefeated: false,  // beaten → Fuji photos reveal + path opens
   bossArenaStart: 13320, // x where the fight begins (after RV camping, before Fuji)
   bossWallX: 13720,      // Ellen stops here; the boss floats ahead toward Mt. Fuji
-  
+  fujiRevealProgress: 0, // 0 = Mt. Fuji shrouded in storm clouds, 1 = fully revealed
+
   // Camera
   camera: {
     x: 0,
@@ -608,6 +618,7 @@ const Game = {
     this.boss = null;
     this.bossActive = false;
     this.bossDefeated = false;
+    this.fujiRevealProgress = 0;
     this.allowSecretOnCollect = false;
     this.endingFocusIndex = 0;
     this.heartsCollected = 0;
@@ -620,9 +631,11 @@ const Game = {
     this.hopTimers = { husband: 0, kid1: 0, kid2: 0, dog: 0 };
     this.player.health = this.player.maxHealth;
     this.player.attackTimer = 0;
+    this.player.attackType = 'karate';
     this.player.serveCooldown = 0;
     this.player.invuln = 0;
     this.player.isDead = false;
+    this.shout = null;
 
     // Setup hearts & hurdles along the entire track
     const walkLimitX = this.levels[this.levels.length - 1].x;
@@ -683,14 +696,16 @@ const Game = {
   },
 
   // Places the tennis racket + tennis-ball pickups, enemies, trampolines and
-  // the trampoline-gated / enemy-drop bonus hearts. The racket (melee) is
-  // grabbed early; the tennis balls (arcing serve) are grabbed just past the
+  // the trampoline-gated / enemy-drop bonus hearts. Ellen starts with a
+  // bare-hand karate chop (short reach); the racket (longer reach) is grabbed a
+  // bit into the journey, and the tennis balls (arcing serve) just past the
   // Wedding milestone (the midpoint).
   setupCombat() {
     const groundY = this.height - 80;
     const trackEnd = this.levels[this.levels.length - 1].x + 400;
-    const racketX = 1000;
+    const racketX = 3600; // a bit later — karate carries the first stretch
     const ballsX = 8250; // just past Wedding (x=8000)
+    this.racketX = racketX;
     this.ballsX = ballsX;
 
     // Pickups: tennis racket, tennis balls, and family locket
@@ -712,9 +727,9 @@ const Game = {
     // Probability an enemy is a tougher 2-hit monster, rising with the memories.
     const toughChance = (section) => section < 3 ? 0 : Math.min(0.6, (section - 2) * 0.12);
 
-    // Ground enemies through the racket region (swing/melee them). Spacing
-    // tightens and 2-hit monsters appear more often as we progress.
-    let gx = racketX + 460;
+    // Ground enemies span the early-to-mid journey. The first stretch is fought
+    // with karate; the racket (grabbed at racketX) makes later ones easier.
+    let gx = 1300;
     while (gx < ballsX - 150) {
       if (!nearMilestone(gx) && !nearPickup(gx)) {
         const section = this.getLevelIndexAtX(gx);
@@ -854,7 +869,7 @@ const Game = {
     this.player.isDead = false;
     this.player.attackTimer = 0;
     this.player.serveCooldown = 0;
-    if (this.player.x >= 1000) {
+    if (this.player.x >= (this.racketX || 3600)) {
       this.player.weapon = 'racket';
       this.pickups.forEach(p => { if (p.kind === 'racket') p.collected = true; });
     }
@@ -1013,8 +1028,9 @@ const Game = {
         }
       }
 
-      // Teleport shortcuts (1-9 and 0 keys) for dev testing
-      if (DEV_MODE && code.startsWith('Digit')) {
+      // Teleport shortcuts (1-9 and 0 keys) — kept enabled everywhere for quick
+      // testing (harmless on TV, which has no number keys).
+      if (code.startsWith('Digit')) {
         const num = parseInt(code.replace('Digit', ''));
         let targetLvlIdx = num - 1;
         if (num === 0) targetLvlIdx = 9;
@@ -1305,6 +1321,10 @@ const Game = {
 
   startGame() {
     this.canvas.focus();
+    this.banner = {
+      timer: 300,
+      text: '🥋 Press SELECT / Enter to karate chop — "Aya!" Grab the tennis racket later for more reach'
+    };
     this.ensureLoop();
   },
 
@@ -1627,15 +1647,22 @@ const Game = {
   // ============================================================
   attack() {
     if (!this.isRunning || this.isPaused || this.player.isDead) return;
-    if (!this.player.weapon) return;            // no racket yet
-    if (this.player.attackTimer > 0) return;    // mid-swing
+    if (this.player.attackTimer > 0) return;    // mid-swing/chop
 
-    // Swing the racket (melee — resolved each active frame in updateCombat)
-    this.player.attackTimer = this.combat.swingDuration;
+    // Karate from the start (short reach); the racket extends reach once grabbed.
+    const usingRacket = this.player.weapon === 'racket';
+    this.player.attackType = usingRacket ? 'racket' : 'karate';
+    this.player.attackMax = usingRacket ? this.combat.swingDuration : this.combat.karateDuration;
+    this.player.attackTimer = this.player.attackMax;
     this._swingId = (this._swingId || 0) + 1; // so one swing damages an enemy once
     AudioEngine.playSlashSFX();
 
-    // Co-op family attacks or single serve
+    if (!usingRacket) {
+      // Karate chop: Ellen shouts "Aya!"
+      this.shout = { text: 'Aya!', timer: this.player.attackMax + 10 };
+    }
+
+    // Co-op family attacks or single serve (only ever active once she has the racket)
     if (this.player.familyAttackActive) {
       this.fireFamilyAttack();
     } else if (this.player.hasBalls && this.player.serveCooldown <= 0) {
@@ -1907,6 +1934,7 @@ const Game = {
     // Tick player timers
     if (this.player.attackTimer > 0) this.player.attackTimer--;
     if (this.player.serveCooldown > 0) this.player.serveCooldown--;
+    if (this.shout && this.shout.timer > 0) this.shout.timer--;
     if (this.player.invuln > 0) this.player.invuln--;
     if (this.banner && this.banner.timer > 0) this.banner.timer--;
 
@@ -1929,7 +1957,7 @@ const Game = {
           this.player.weapon = 'racket';
           this.banner = {
             timer: 240,
-            text: '🎾 Tennis racket! Press SELECT / Enter to swing at the monsters'
+            text: '🎾 Tennis racket! Longer reach than your karate chop — swing at the monsters'
           };
         } else if (pk.kind === 'balls') {
           this.player.hasBalls = true;
@@ -2010,23 +2038,33 @@ const Game = {
       this.updateBoss();
     }
 
-    // --- Racket swing can also hit the boss when it dives low enough ---
-    if (this.player.weapon === 'racket' && this.player.attackTimer > 0 &&
+    // Once the boss falls, the storm clouds over Mt. Fuji slowly part (the reward reveal)
+    if (this.bossDefeated && this.fujiRevealProgress < 1) {
+      this.fujiRevealProgress = Math.min(1, this.fujiRevealProgress + 0.006);
+    }
+
+    // Melee reach depends on the current attack (karate is shorter than racket)
+    const meleeReach = this.player.attackType === 'racket'
+      ? this.combat.swingReach
+      : this.combat.karateReach;
+
+    // --- Melee can also hit the boss when it dives low enough ---
+    if (this.player.attackTimer > 0 &&
         this.boss && this.boss.alive && this.boss.lastSwingHit !== this._swingId) {
       const b = this.boss;
       const dir = this.player.dir;
       const dx = (b.x - this.player.x) * dir;
-      if (dx > -30 && dx < this.combat.swingReach + 40 && Math.abs(b.y - playerMidY) < 80) {
+      if (dx > -30 && dx < meleeReach + 40 && Math.abs(b.y - playerMidY) < 80) {
         b.lastSwingHit = this._swingId;
         this.hitBoss(1);
       }
     }
 
-    // --- Racket swing hit resolution (ground enemies only) ---
+    // --- Melee hit resolution (ground enemies only) ---
     // One swing damages a given enemy at most once (guarded by swing id), so a
     // 2-hit monster survives a single swing.
-    if (this.player.weapon === 'racket' && this.player.attackTimer > 0) {
-      const reach = this.combat.swingReach;
+    if (this.player.attackTimer > 0) {
+      const reach = meleeReach;
       const dir = this.player.dir;
       this.enemies.forEach(e => {
         if (!e.alive || e.type !== 'ground') return;
@@ -2453,6 +2491,15 @@ const Game = {
       }
     });
 
+    // Storm shroud over Mt. Fuji — hides the mountain until the boss is beaten,
+    // then slowly parts to reveal it as the reward.
+    const fujiLvl = this.levels[this.levels.length - 1];
+    const fujiScreenX = fujiLvl.x - this.camera.x;
+    const shroudAlpha = 1 - (this.fujiRevealProgress || 0);
+    if (shroudAlpha > 0.01 && fujiScreenX > -460 && fujiScreenX < this.width + 460) {
+      this.drawFujiShroud(fujiScreenX, shroudAlpha, Date.now());
+    }
+
     // Draw Floating Polaroid Photos in the sky
     this.levels.forEach((lvl, idx) => {
       // The Mt. Fuji memory stays sealed until the Storm Guardian is defeated
@@ -2699,33 +2746,86 @@ const Game = {
     const pX = this.player.x - camX;
     const blink = this.player.invuln > 0 && Math.floor(this.player.invuln / 4) % 2 === 0;
     if (!blink) {
+      const attacking = this.player.attackTimer > 0;
+      const isKarate = this.player.attackType === 'karate';
+      const shouting = attacking && isKarate;
+
       Assets.drawEllen(
         this.ctx,
         pX,
         this.player.y,
         this.player.outfit,
         this.player.animFrame,
-        this.player.dir
+        this.player.dir,
+        1,
+        shouting // open her mouth mid karate chop
       );
 
       // Racket held in hand (sways with her stride, swings on attack)
       if (this.player.weapon) {
-        const swing = this.player.attackTimer > 0
-          ? 1 - this.player.attackTimer / this.combat.swingDuration
+        const swing = attacking
+          ? 1 - this.player.attackTimer / (this.player.attackMax || this.combat.swingDuration)
           : 0;
         const moving = Math.abs(this.player.vx) > 0.5;
         Assets.drawHeldWeapon(this.ctx, pX, this.player.y, this.player.weapon, this.player.dir, swing, this.player.animFrame, moving);
       }
 
-      // Racket swing arc effect
-      if (this.player.weapon === 'racket' && this.player.attackTimer > 0) {
-        const prog = 1 - this.player.attackTimer / this.combat.swingDuration;
-        Assets.drawSlash(this.ctx, pX + this.player.dir * 14, this.player.y - 30, this.player.dir, prog);
+      // Attack effect: racket slash arc, or a karate chop
+      if (attacking) {
+        const prog = 1 - this.player.attackTimer / (this.player.attackMax || this.combat.swingDuration);
+        if (isKarate) {
+          Assets.drawKarateChop(this.ctx, pX + this.player.dir * 12, this.player.y - 32, this.player.dir, prog);
+        } else if (this.player.weapon === 'racket') {
+          Assets.drawSlash(this.ctx, pX + this.player.dir * 14, this.player.y - 30, this.player.dir, prog);
+        }
+      }
+
+      // "Aya!" speech bubble while shouting
+      if (this.shout && this.shout.timer > 0) {
+        Assets.drawSpeechBubble(this.ctx, pX + this.player.dir * 10, this.player.y - 80, this.shout.text);
       }
     }
 
     // HUD overlays rendered on canvas
     this.drawHUD();
+  },
+
+  // A bank of storm clouds shrouding Mt. Fuji. `alpha` fades 1 -> 0 as the
+  // reveal plays out after the boss is beaten, parting the clouds.
+  drawFujiShroud(cx, alpha, now) {
+    const ctx = this.ctx;
+    const t = now * 0.00006;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, alpha);
+
+    // Soft base wash covering the whole mountain footprint
+    ctx.fillStyle = '#c3cbd9';
+    ctx.beginPath();
+    ctx.ellipse(cx, 215, 430, 215, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Layered drifting cloud puffs for a billowing storm look. As the reveal
+    // plays, each layer also slides outward so the clouds visibly part.
+    const part = (1 - alpha) * 90; // px the banks spread apart while clearing
+    const blobs = [
+      [-250, 60, 150, 80, '#aab4c6', -1],
+      [-80, 30, 200, 105, '#d4dbe8', -1],
+      [110, 55, 180, 95, '#bcc5d6', 1],
+      [270, 80, 150, 82, '#a8b2c4', 1],
+      [10, 130, 250, 120, '#dbe1ed', 0],
+      [-180, 180, 190, 100, '#cad2e0', -1],
+      [200, 185, 200, 105, '#c0c9da', 1],
+      [-30, 235, 240, 110, '#d0d7e4', 0],
+      [40, -10, 150, 70, '#b6c0d1', 0]
+    ];
+    blobs.forEach((b, i) => {
+      const drift = Math.sin(t + i) * 16;
+      ctx.fillStyle = b[4];
+      ctx.beginPath();
+      ctx.ellipse(cx + b[0] + drift + b[5] * part, 60 + b[1], b[2], b[3], 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
   },
 
   // The Storm Guardian: a dark thundercloud oni hovering before Mt. Fuji
@@ -2846,10 +2946,16 @@ const Game = {
     this.ctx.fillText('HP', hbX - 4, hbY - 7);
 
     // --- Weapon badge ---
-    if (this.player.weapon) {
+    {
       let wName = this.player.hasBalls ? 'Racket + Balls' : 'Racket';
       let wIcon = '🎾';
       let wWidth = this.player.hasBalls ? 128 : 86;
+      if (!this.player.weapon) {
+        // Bare-hand karate (the starting move)
+        wName = 'Karate';
+        wIcon = '🥋';
+        wWidth = 86;
+      }
       if (this.player.familyAttackActive) {
         wName = 'Family Unity 👨‍👩‍👧‍👦';
         wIcon = '💖';
