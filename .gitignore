@@ -1,4 +1,11 @@
 node_modules/
 .DS_Store
 .gemini/
+.claude/
 .env
+
+# Personal photos / marketing image assets — keep out of the public Pages deploy
+linkedin/*.HEIC
+linkedin/*.heic
+linkedin/*.webp
+linkedin/*.png

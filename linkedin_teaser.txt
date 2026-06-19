@@ -1,0 +1,27 @@
+Headline: Building a custom Android TV game (WIP!) 🛠️📺
+
+What's more romantic (nerdy) than vibe coding a gift? 🙃 💻✨
+
+Just got the D-pad remote PoC working on the TV via a sideloaded TV Bro browser. It's still laggy, but playable! 
+
+Since I'm a tightwad who wanted to avoid expensive dinners/handbags (she'll appreciate that, right?! 👜🍽️), I'm building a side-scrolling 2D platformer tracing a decade of memories together. It needs to run "seamlessly" across mobile, desktop, and smart TVs.
+
+The stack is lightweight and dependency-free:
+🎨 Procedural Vector Art: Redrawn on HTML5 Canvas in real-time.
+🎵 Procedural Audio: Real-time chiptunes synthesized using the Web Audio API.
+🕹️ Leanback Input: TV D-Pad and Bluetooth gamepads.
+
+Optimizing for low-spec TV hardware led to some cool low-level browser challenges:
+
+1. WebView Mouse Emulation 🖱️
+Android TV WebViews force a virtual cursor (the blue dot). To bypass this and capture raw D-Pad key events (`ArrowLeft`, `ArrowRight`), I had to override active DOM focus and target canvas focus programmatically.
+
+2. Capping Canvas DPI on 4K Screens 📺
+Smart TVs report high Device Pixel Ratios (2.x-3.x), forcing a weak TV processor to render a massive 2700x1500 canvas. Capping rendering DPR to 1.25 and letting CSS upscale reduced pixel fill overhead by 80%, keeping the game loop at 60 FPS.
+
+3. Audio Thread vs Render Lag 🎵
+With the music synth running on JS, any rendering lag delays the Web Audio scheduler, causing audio stuttering. Optimizing the draw loops (like increasing parallax step sizes to slash trig math by 66%) was crucial to keep the audio thread in sync.
+
+For anyone who's built for Chromecast/Android TV: how did you handle low-end CPU overhead and Web Audio scheduler drift?
+
+#RetroGaming #GameDev #SystemsProgramming #WebAudio #Chiptune #AndroidTV #PerformanceOptimization #LowLevel #CreativeCoding #VibeCoding
