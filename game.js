@@ -1846,6 +1846,9 @@ const Game = {
   hitBoss(dmg) {
     const b = this.boss;
     if (!b || !b.alive) return;
+    if (DEV_MODE) {
+      dmg = 100; // One-shot boss in local development/dev mode
+    }
     b.hp -= dmg;
     b.hitFlash = 10;
     if (b.hp <= 0) {
