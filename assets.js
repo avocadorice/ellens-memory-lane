@@ -1605,17 +1605,7 @@ const Assets = {
         ctx.fillRect(stageX + 71, -24, 5, 24);
         ctx.fillRect(stageX + 12, -46, 4, 22);  // back supports
         ctx.fillRect(stageX + 72, -46, 4, 22);
-        // Floating hearts
-        ctx.fillStyle = '#ff5d8f';
-        [[-8, -96], [22, -110], [-30, -116]].forEach(h => {
-          const hy = h[1] + Math.sin(time + h[0]) * 4;
-          ctx.beginPath();
-          ctx.arc(stageX + h[0] - 4, hy, 4, Math.PI, 0);
-          ctx.arc(stageX + h[0] + 4, hy, 4, Math.PI, 0);
-          ctx.lineTo(stageX + h[0], hy + 8);
-          ctx.closePath();
-          ctx.fill();
-        });
+        // (Removed decorative floating hearts to avoid confusion with actual collectibles)
         break;
 
       default:
