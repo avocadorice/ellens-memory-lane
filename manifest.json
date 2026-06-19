@@ -1,6 +1,6 @@
 {
-  "name": "Ellen's Great Adventure",
-  "short_name": "Ellen's Adventure",
+  "name": "Ellen's Memory Lane",
+  "short_name": "Memory Lane",
   "description": "A 2D side-scrolling birthday memory lane game for Ellen.",
   "start_url": "./index.html",
   "display": "standalone",

@@ -1,4 +1,4 @@
-# 🎂 Ellen's Great Adventure: 2D side-scrolling Memory Lane Game
+# 🎂 Ellen's Memory Lane: 2D side-scrolling Memory Lane Game
 
 A beautiful, interactive, and personalized 2D HTML5 Canvas side-scrolling game built as a special birthday gift for Ellen.
 

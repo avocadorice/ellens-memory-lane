@@ -1,4 +1,4 @@
-// Core Game Engine for Ellen's Great Adventure
+// Core Game Engine for Ellen's Memory Lane
 
 // --- WEBASSEMBLY PHYSICS MODULE ---
 let wasmInstance = null;
