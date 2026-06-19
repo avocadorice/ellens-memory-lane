@@ -1760,10 +1760,10 @@ const Game = {
       x: this.bossWallX + 230,
       baseY: 200, y: 120,
       w: 120, h: 120,
-      hp: 18, maxHp: 18,
+      hp: 12, maxHp: 12, // Balanced down from 18 HP
       alive: true, dir: -1, frame: 0,
       hitFlash: 0, lastSwingHit: -1,
-      shootTimer: 90,
+      shootTimer: 120, // Increased initial wait
       swoopTimer: 260, swooping: false, swoopProg: 0,
       introT: 100 // brief grace before it starts attacking
     };
@@ -1792,7 +1792,7 @@ const Game = {
 
     let targetX, targetY;
     if (b.swooping) {
-      b.swoopProg += enraged ? 0.022 : 0.016;
+      b.swoopProg += enraged ? 0.018 : 0.012; // Slower swoop dive speed to allow reaction
       const dive = Math.sin(Math.min(1, b.swoopProg) * Math.PI); // 0 -> 1 -> 0
       targetX = b.homeX + (this.player.x - b.homeX) * dive * 0.85;
       targetY = b.baseY + dive * 150;
@@ -1815,13 +1815,13 @@ const Game = {
       b.shootTimer--;
       if (b.shootTimer <= 0) {
         this.bossShoot(enraged);
-        b.shootTimer = enraged ? 52 : 88;
+        b.shootTimer = enraged ? 80 : 120; // Slower shoot rate to dodge easier
       }
     }
 
-    // Contact damage
+    // Contact damage (smaller hitbox radius to feel more fair)
     const playerMidY = this.player.y - 28;
-    if (Math.abs(b.x - this.player.x) < b.w * 0.42 && Math.abs(b.y - playerMidY) < b.h * 0.42) {
+    if (Math.abs(b.x - this.player.x) < b.w * 0.35 && Math.abs(b.y - playerMidY) < b.h * 0.35) {
       this.damagePlayer();
     }
   },
@@ -1831,7 +1831,7 @@ const Game = {
     const playerMidY = this.player.y - 28;
     const baseAng = Math.atan2(playerMidY - b.y, this.player.x - b.x);
     const spread = enraged ? [-0.3, -0.1, 0.1, 0.3] : [-0.18, 0.18];
-    const sp = this.combat.enemyBulletSpeed * 1.1;
+    const sp = this.combat.enemyBulletSpeed * 0.85; // Slower projectile speed
     spread.forEach(off => {
       const a = baseAng + off;
       this.enemyProjectiles.push({
