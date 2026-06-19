@@ -34,6 +34,8 @@ async function initWasm() {
 // --- AUDIO ENGINE (Web Audio API Procedural Synth) ---
 const AudioEngine = {
   ctx: null,
+  masterGain: null,
+  limiter: null,
   isPlaying: false,
   tempo: 105, // BPM
   schedulerInterval: null,
@@ -50,6 +52,20 @@ const AudioEngine = {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)({
         latencyHint: 'playback'
       });
+      // Master bus: every voice routes through a gain stage into a limiter, so
+      // overlapping oscillators (chords + melody + SFX) can never sum past
+      // 0 dBFS and crackle/distort on the TV's DAC.
+      const now = this.ctx.currentTime;
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.setValueAtTime(0.6, now);
+      this.limiter = this.ctx.createDynamicsCompressor();
+      this.limiter.threshold.setValueAtTime(-3, now); // start clamping just below full scale
+      this.limiter.knee.setValueAtTime(0, now);       // hard knee = true limiting
+      this.limiter.ratio.setValueAtTime(20, now);
+      this.limiter.attack.setValueAtTime(0.003, now);
+      this.limiter.release.setValueAtTime(0.25, now);
+      this.masterGain.connect(this.limiter);
+      this.limiter.connect(this.ctx.destination);
     } catch (e) {
       console.warn("Web Audio API not supported.", e);
     }
@@ -175,7 +191,7 @@ const AudioEngine = {
     gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.masterGain || this.ctx.destination);
 
     osc.start(startTime);
     osc.stop(startTime + duration);
@@ -202,11 +218,12 @@ const AudioEngine = {
     osc.frequency.setValueAtTime(140, time);
     osc.frequency.exponentialRampToValueAtTime(380, time + 0.12);
 
-    gain.gain.setValueAtTime(0.12, time);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.12, time + 0.008); // soft attack, no click
     gain.gain.exponentialRampToValueAtTime(0.01, time + 0.12);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.masterGain || this.ctx.destination);
 
     osc.start();
     osc.stop(time + 0.12);
@@ -221,13 +238,14 @@ const AudioEngine = {
 
     osc.type = 'sine';
     osc.frequency.setValueAtTime(523.25, time); // C5
-    osc.frequency.setValueAtTime(783.99, time + 0.08); // G5
+    osc.frequency.exponentialRampToValueAtTime(783.99, time + 0.08); // glide to G5 (instant jump = click)
 
-    gain.gain.setValueAtTime(0.15, time);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.15, time + 0.008); // soft attack, no click
     gain.gain.exponentialRampToValueAtTime(0.01, time + 0.22);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.masterGain || this.ctx.destination);
 
     osc.start();
     osc.stop(time + 0.22);
@@ -246,11 +264,12 @@ const AudioEngine = {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, time + idx * 0.07);
       
-      gain.gain.setValueAtTime(0.12, time + idx * 0.07);
+      gain.gain.setValueAtTime(0.0001, time + idx * 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.12, time + idx * 0.07 + 0.008); // soft attack, no click
       gain.gain.exponentialRampToValueAtTime(0.005, time + idx * 0.07 + 0.35);
       
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.masterGain || this.ctx.destination);
       
       osc.start(time + idx * 0.07);
       osc.stop(time + idx * 0.07 + 0.45);
