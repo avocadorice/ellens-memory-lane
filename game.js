@@ -307,6 +307,11 @@ const AudioEngine = {
     this._blip(220, 760, 0.18, 0.12, 'sine');
   },
 
+  playEnemyHurtSFX() {
+    // Short, soft "ouch but still standing" thud — lower/quieter than defeat.
+    this._blip(380, 260, 0.10, 0.07, 'square');
+  },
+
   playEnemyDefeatSFX() {
     this._blip(420, 880, 0.18, 0.10, 'triangle');
     this._blip(660, 1100, 0.22, 0.06, 'sine');
