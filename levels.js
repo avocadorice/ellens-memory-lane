@@ -165,6 +165,8 @@ const levelsData = [
     year: "October 2020",
     x: 10400,
     photos: ["photos/2nd_home.webp"],
+    // Frame the full width of the house, trimming most of the foreground road
+    photoCrop: { zoom: 1.35, focusX: 0.03, focusY: 0.18 },
     skyGradient: {
       top: "#30cfd0",
       bottom: "#330867"

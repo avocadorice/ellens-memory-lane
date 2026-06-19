@@ -718,6 +718,10 @@ const Game = {
     const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
     const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150 || Math.abs(x - locketX) < 150;
 
+    // Don't let a random hurdle (e.g. the camping campfire art) sit on top of a
+    // pickup like the Locket of Unity — clear any that overlap a pickup spot.
+    this.hurdles = this.hurdles.filter(h => !nearPickup(h.x));
+
     const groundKinds = ['slime_green', 'slime_purple', 'slime_teal'];
     const flyingKinds = ['cloud', 'bat'];
     let gi = 0, fi = 0;

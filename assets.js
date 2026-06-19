@@ -2286,13 +2286,19 @@ const Assets = {
   },
 
   // Draw an image scaled to COVER the target rect (center-crop, no stretching).
-  _drawImageCover(ctx, img, dx, dy, dw, dh) {
+  _drawImageCover(ctx, img, dx, dy, dw, dh, opts) {
     const iw = img.naturalWidth, ih = img.naturalHeight;
     if (!iw || !ih) return;
     const ir = iw / ih, dr = dw / dh;
-    let sx, sy, sw, sh;
-    if (ir > dr) { sh = ih; sw = ih * dr; sx = (iw - sw) / 2; sy = 0; }
-    else { sw = iw; sh = iw / dr; sx = 0; sy = (ih - sh) / 2; }
+    const zoom = (opts && opts.zoom) || 1;
+    const fx = (opts && opts.focusX != null) ? opts.focusX : 0.5;
+    const fy = (opts && opts.focusY != null) ? opts.focusY : 0.5;
+    let sw, sh;
+    if (ir > dr) { sh = ih / zoom; sw = sh * dr; }
+    else { sw = iw / zoom; sh = sw / dr; }
+    // Position the crop window by focal point, clamped inside the image
+    let sx = Math.max(0, Math.min(iw - sw, (iw - sw) * fx));
+    let sy = Math.max(0, Math.min(ih - sh, (ih - sh) * fy));
     ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
   },
 
@@ -2330,8 +2336,10 @@ const Assets = {
     // Check if the user has loaded a valid image (the current one in the cycle)
     const img = (level.imgElements || [])[imgIdx] || (level.imgElements || [])[0];
     if (img && img.complete && img.naturalWidth > 0) {
-      // Draw actual photo, center-cropped to fill the frame (no stretching)
-      this._drawImageCover(ctx, img, px, py, photoW, photoH);
+      // Draw actual photo, cropped to fill the frame (no stretching). An optional
+      // per-level `photoCrop` {zoom, focusX, focusY} reframes a specific photo
+      // (e.g. zoom past foreground pavement onto the house).
+      this._drawImageCover(ctx, img, px, py, photoW, photoH, level.photoCrop);
     } else {
       // Draw procedural sketch placeholder! 🎨
       // Soft pastel colored background for the photo frame
@@ -2366,11 +2374,18 @@ const Assets = {
 
     // --- CAPTION TEXT ---
     ctx.fillStyle = '#2b1d1d';
-    // Handwritten caption look
-    ctx.font = '600 10.5px "Outfit", sans-serif';
     ctx.textAlign = 'center';
+    // Shrink the name to fit the card so long titles (e.g. "Moving to Our
+    // Second House") don't spill out either side of the polaroid.
+    const maxCaptionW = cardW - 12;
+    let nameSize = 10.5;
+    ctx.font = `600 ${nameSize}px "Outfit", sans-serif`;
+    while (ctx.measureText(level.name).width > maxCaptionW && nameSize > 6.5) {
+      nameSize -= 0.5;
+      ctx.font = `600 ${nameSize}px "Outfit", sans-serif`;
+    }
     ctx.fillText(level.name, 0, cardH / 2 - 20);
-    
+
     ctx.fillStyle = 'rgba(43, 29, 29, 0.6)';
     ctx.font = '500 8.5px "Outfit", sans-serif';
     ctx.fillText(level.year, 0, cardH / 2 - 8);
