@@ -679,6 +679,61 @@ input:checked + .slider:before {
   background: linear-gradient(135deg, rgba(255, 71, 126, 0.85) 0%, rgba(255, 112, 150, 0.85) 100%);
 }
 
+.ctrl-cluster {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  pointer-events: none;
+}
+.attack-btn {
+  background: linear-gradient(135deg, rgba(92, 107, 192, 0.65) 0%, rgba(120, 134, 203, 0.65) 100%);
+  border: 2px solid rgba(120, 134, 203, 0.5);
+  font-size: 1.6rem;
+}
+.attack-btn:active {
+  background: linear-gradient(135deg, rgba(92, 107, 192, 0.9) 0%, rgba(120, 134, 203, 0.9) 100%);
+}
+
+/* Secret prize (100% completion) screen */
+.secret-overlay {
+  background: radial-gradient(circle at 50% 30%, rgba(255, 215, 90, 0.28), rgba(20, 12, 40, 0.92) 70%);
+}
+.secret-panel {
+  border: 1px solid rgba(255, 224, 102, 0.45);
+  box-shadow: 0 0 60px rgba(255, 215, 90, 0.35), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.secret-card {
+  background: rgba(255, 224, 102, 0.08) !important;
+  border: 1px solid rgba(255, 224, 102, 0.35) !important;
+  border-radius: 16px;
+  padding: 25px;
+  margin: 20px 0;
+}
+
+.hearts-hint {
+  color: #ffd6e0;
+  font-size: 0.95rem;
+  margin: 4px 0 18px;
+  line-height: 1.5;
+}
+.ending-btn-row {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.ending-choice {
+  padding: 12px 26px;
+  font-size: 1.05rem;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}
+.ending-choice.focused {
+  outline: 3px solid #ffe066;
+  outline-offset: 2px;
+  transform: scale(1.05);
+}
+
 .hidden {
   display: none !important;
 }

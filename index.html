@@ -49,8 +49,15 @@
               <span class="hint-text">Walk Left & Right</span>
             </div>
             <div class="hint-item">
-              <span class="key">Space</span> or <span class="key">⬆️</span> or <span class="key">W</span>
-              <span class="hint-text">Jump over hurdles</span>
+              <span class="key">⬆️</span> or <span class="key">Space</span> or <span class="key">W</span>
+              <span class="hint-text">Jump (and bounce on trampolines!)</span>
+            </div>
+            <div class="hint-item">
+              <span class="key">● Select</span> or <span class="key">Enter</span> or <span class="key">F</span>
+              <span class="hint-text">Attack — slash with the sword, shoot with the blaster</span>
+            </div>
+            <div class="hint-item">
+              <span class="hint-text">⚔️ Grab the sword early • 🔫 Find the blaster mid-journey • collect every ❤️ for a secret prize!</span>
             </div>
             <div class="hint-item mobile-only-hint">
               <span class="hint-text">Or use the on-screen buttons on mobile!</span>
@@ -101,7 +108,50 @@
           </p>
         </div>
 
-        <button id="replay-btn" class="btn primary-btn" tabindex="-1" style="padding: 12px 30px; font-size: 1.05rem; border-radius: 20px; transition: all 0.3s ease;">Play Again 🔁</button>
+        <p id="ending-hearts-hint" class="hearts-hint">💗 Psst… collect every heart for a special secret prize!</p>
+
+        <div class="ending-btn-row">
+          <button id="keep-exploring-btn" class="btn primary-btn ending-choice focused" tabindex="-1">Keep Exploring 🚶‍♀️</button>
+          <button id="replay-btn" class="btn secondary-btn ending-choice" tabindex="-1">Play Again 🔁</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Overlay: Game Over Screen -->
+    <div id="game-over-screen" class="overlay">
+      <div class="glass-panel menu-panel" style="text-align: center;">
+        <div class="heart-header">💔</div>
+        <h1 class="title" style="font-size: 2rem;">Knocked Down!</h1>
+        <p class="subtitle">A life obstacle got the better of you this time — but every couple hits bumps in the road. Dust yourself off and tackle this stretch again!</p>
+        <button id="retry-btn" class="btn primary-btn" tabindex="-1" style="padding: 12px 30px; font-size: 1.05rem; border-radius: 20px;">Try Again 🔄</button>
+      </div>
+    </div>
+
+    <!-- UI Overlay: Secret Prize Screen (unlocked by collecting 100% of hearts) -->
+    <div id="secret-screen" class="overlay secret-overlay">
+      <div class="glass-panel ending-panel secret-panel" style="text-align: center;">
+        <div class="heart-header">🏆</div>
+        <h1 class="congrats-title">You Found Every Heart, Ellen! 💛</h1>
+        <p class="congrats-subtitle" style="margin-bottom: 20px;">100% completion — you've unlocked the secret prize!</p>
+
+        <!-- ============================================================
+             ✨  CUSTOMIZE THE SECRET PRIZE HERE  ✨
+             Replace the inside of #secret-reveal with your real payoff:
+               • A video:  <video src="secret.mp4" autoplay controls playsinline
+                            style="max-width:100%;border-radius:16px;"></video>
+               • A photo:  <img src="photos/gift.jpg" style="max-width:100%;border-radius:16px;">
+               • A reveal message hinting at a physical gift (necklace, trip, ...)
+             ============================================================ -->
+        <div id="secret-reveal" class="ending-message-card secret-card">
+          <p style="font-size: 1.15rem; line-height: 1.6; color: #fff; margin-bottom: 12px; font-weight: 500;">
+            🎁 Your real surprise is waiting for you in the real world...
+          </p>
+          <p style="font-family: 'Fredoka', sans-serif; font-size: 1.25rem; color: #ffe066; margin-top: 14px; font-weight: 600;">
+            (Placeholder — swap this card for your video or gift reveal!)
+          </p>
+        </div>
+
+        <button id="secret-replay-btn" class="btn primary-btn" tabindex="-1" style="padding: 12px 30px; font-size: 1.05rem; border-radius: 20px;">Play Again 🔁</button>
       </div>
     </div>
 
@@ -118,9 +168,14 @@
 
     <!-- Mobile Virtual Controls -->
     <div id="mobile-controls">
-      <button id="btn-left" class="ctrl-btn">◀</button>
-      <button id="btn-jump" class="ctrl-btn action-btn">JUMP</button>
-      <button id="btn-right" class="ctrl-btn">▶</button>
+      <div class="ctrl-cluster ctrl-left">
+        <button id="btn-left" class="ctrl-btn">◀</button>
+        <button id="btn-right" class="ctrl-btn">▶</button>
+      </div>
+      <div class="ctrl-cluster ctrl-right">
+        <button id="btn-attack" class="ctrl-btn action-btn attack-btn">⚔️</button>
+        <button id="btn-jump" class="ctrl-btn action-btn">JUMP</button>
+      </div>
     </div>
 
     <!-- HUD Controls (Visible during gameplay) -->
@@ -141,6 +196,8 @@
       <div class="dev-metric"><span>Player Pos:</span><span id="dev-player-pos">X: 150, Y: 420</span></div>
       <button id="dev-toggle-opt-btn" class="btn secondary-btn" tabindex="-1" style="width: 100%; margin-top: 10px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Toggle Cache/WASM</button>
       <button id="dev-clear-cache-btn" class="btn secondary-btn" tabindex="-1" style="width: 100%; margin-top: 5px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Clear Sprite Cache</button>
+      <button id="dev-win-btn" class="btn secondary-btn" tabindex="-1" style="width: 100%; margin-top: 5px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none; background: linear-gradient(135deg, rgba(255,215,90,0.4), rgba(255,180,80,0.4)); border-color: rgba(255,224,102,0.5);">🏆 Test Secret Prize (100%)</button>
+      <button id="dev-end-btn" class="btn secondary-btn" tabindex="-1" style="width: 100%; margin-top: 5px; padding: 6px; font-size: 0.75rem; border-radius: 6px; cursor: pointer; text-shadow: none;">Test Normal Ending</button>
     </div>
   </div>
 

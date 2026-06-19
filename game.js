@@ -274,6 +274,77 @@ const AudioEngine = {
       osc.start(time + idx * 0.07);
       osc.stop(time + idx * 0.07 + 0.45);
     });
+  },
+
+  // Generic short tone helper for SFX
+  _blip(freqStart, freqEnd, dur, vol, type = 'triangle') {
+    if (!this.ctx) return;
+    this.resume();
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freqStart, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t + dur);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+    osc.connect(gain);
+    gain.connect(this.masterGain || this.ctx.destination);
+    osc.start();
+    osc.stop(t + dur);
+  },
+
+  playSlashSFX() {
+    this._blip(620, 180, 0.16, 0.10, 'sawtooth');
+  },
+
+  playShootSFX() {
+    this._blip(880, 320, 0.12, 0.09, 'square');
+  },
+
+  playBounceSFX() {
+    this._blip(220, 760, 0.18, 0.12, 'sine');
+  },
+
+  playEnemyDefeatSFX() {
+    this._blip(420, 880, 0.18, 0.10, 'triangle');
+    this._blip(660, 1100, 0.22, 0.06, 'sine');
+  },
+
+  playHurtSFX() {
+    this._blip(300, 90, 0.22, 0.13, 'sawtooth');
+  },
+
+  playPickupSFX() {
+    if (!this.ctx) return;
+    this.resume();
+    const arp = [523.25, 659.25, 783.99, 1046.50];
+    arp.forEach((f, i) => this._delayedBlip(f, f, 0.18, 0.09, 'triangle', i * 0.06));
+  },
+
+  playGameOverSFX() {
+    if (!this.ctx) return;
+    this.resume();
+    const notes = [392.00, 329.63, 261.63, 196.00];
+    notes.forEach((f, i) => this._delayedBlip(f, f * 0.98, 0.4, 0.11, 'triangle', i * 0.16));
+  },
+
+  _delayedBlip(freqStart, freqEnd, dur, vol, type, delay) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freqStart, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t + dur);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+    osc.connect(gain);
+    gain.connect(this.masterGain || this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + dur);
   }
 };
 
@@ -305,17 +376,48 @@ const Game = {
     isGrounded: false,
     outfit: 'casual', // 'graduation', 'wedding', 'casual', 'hiking'
     animFrame: 0,
-    dir: 1
+    dir: 1,
+    // --- Combat state ---
+    weapon: null,      // null | 'racket'
+    hasBalls: false,   // unlocked by tennis-ball pickup → swing also serves an arcing ball
+    health: 5,
+    maxHealth: 5,
+    attackTimer: 0,    // counts down during a racket swing
+    serveCooldown: 0,  // counts down between served tennis balls
+    invuln: 0,         // i-frames after taking damage
+    isDead: false
+  },
+
+  // Combat tuning constants
+  combat: {
+    swingDuration: 16,   // frames a racket swing stays active
+    swingReach: 60,      // px in front of player a swing hits
+    serveCooldown: 20,   // frames between served tennis balls
+    ballSpeedX: 8.5,     // arcing tennis-ball launch (horizontal)
+    ballSpeedY: -10,     // arcing tennis-ball launch (upward)
+    ballGravity: 0.4,    // gravity pulling the ball back down (the arc)
+    invulnFrames: 70,    // i-frames after a hit (~1.1s)
+    trampolineForce: -22, // super-bounce velocity (normal jump is -13)
+    enemyBulletSpeed: 4.4, // flying foes' projectiles aimed at Ellen
+    enemyShootRange: 540,  // only fire when she's within this horizontal range
+    enemyShootMin: 75,     // min frames between an enemy's shots
+    enemyShootMax: 150     // max frames between an enemy's shots
   },
 
   // Level data reference
   levels: levelsData,
-  
+
   // Entities
   hearts: [],
   hurdles: [],
   parallaxLayers: [],
   companions: [], // Trailing list of entities (husband, dog, stroller, etc.)
+  enemies: [],     // life-obstacle foes
+  projectiles: [], // gun bullets (player's)
+  enemyProjectiles: [], // bullets fired BY flying enemies at Ellen
+  pickups: [],     // sword/gun pickups
+  trampolines: [], // bounce pads
+  poofs: [],       // defeat puff FX
   
   // Camera
   camera: {
@@ -413,7 +515,25 @@ const Game = {
     this.hearts = [];
     this.hurdles = [];
     this.companions = [];
+    this.enemies = [];
+    this.projectiles = [];
+    this.enemyProjectiles = [];
+    this.pickups = [];
+    this.trampolines = [];
+    this.poofs = [];
+    this.banner = null;
+    this.allowSecretOnCollect = false;
+    this.endingFocusIndex = 0;
     this.heartsCollected = 0;
+
+    // Reset player combat loadout
+    this.player.weapon = null;
+    this.player.hasBalls = false;
+    this.player.health = this.player.maxHealth;
+    this.player.attackTimer = 0;
+    this.player.serveCooldown = 0;
+    this.player.invuln = 0;
+    this.player.isDead = false;
 
     // Setup hearts & hurdles along the entire track
     const trackEnd = this.levels[this.levels.length - 1].x + 400;
@@ -428,13 +548,28 @@ const Game = {
 
       if (!nearMilestone) {
         // Collectible heart
-        this.hearts.push({
+        const baseY = this.height - 130 - Math.random() * 60;
+        const heart = {
           x: x,
-          y: this.height - 130 - Math.random() * 60,
+          y: baseY,
           width: 16,
           height: 16,
-          collected: false
-        });
+          collected: false,
+          spawned: true,
+          fromEnemy: false,
+          falling: false,
+          section: this.getLevelIndexAtX(x)
+        };
+        // ~35% of hearts drift side-to-side so a straight vertical jump won't
+        // catch them — she has to jump AND move into the heart.
+        if (Math.random() < 0.35) {
+          heart.motion = {
+            baseX: x, baseY,
+            ampX: 32, ampY: 12,
+            speed: 0.045, phase: Math.random() * Math.PI * 2
+          };
+        }
+        this.hearts.push(heart);
 
         // Chance of obstacle hurdle below it
         if (Math.random() > 0.4) {
@@ -451,20 +586,136 @@ const Game = {
       }
     }
 
+    // Spawn weapons, enemies, trampolines and enemy-drop hearts
+    this.setupCombat();
+
     this.totalHearts = this.hearts.length;
     this.updateHeartsUI();
   },
 
+  // Places the tennis racket + tennis-ball pickups, enemies, trampolines and
+  // the trampoline-gated / enemy-drop bonus hearts. The racket (melee) is
+  // grabbed early; the tennis balls (arcing serve) are grabbed just past the
+  // Wedding milestone (the midpoint).
+  setupCombat() {
+    const groundY = this.height - 80;
+    const trackEnd = this.levels[this.levels.length - 1].x + 400;
+    const racketX = 1000;
+    const ballsX = 8250; // just past Wedding (x=8000)
+    this.ballsX = ballsX;
+
+    // Pickups: tennis racket, then tennis balls
+    this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
+    this.pickups.push({ x: ballsX, y: groundY, kind: 'balls', collected: false, frame: 0 });
+
+    const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
+    const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150;
+
+    const groundKinds = ['slime_green', 'slime_purple', 'slime_teal'];
+    const flyingKinds = ['cloud', 'bat'];
+    let gi = 0, fi = 0;
+
+    // Difficulty ramps 0 -> 1 across the journey (Dating x2000 ... Fuji xEnd).
+    const lastLevelX = this.levels[this.levels.length - 1].x;
+    const progress = (x) => Math.max(0, Math.min(1, (x - 2000) / (lastLevelX - 2000)));
+    // Probability an enemy is a tougher 2-hit monster, rising with the memories.
+    const toughChance = (section) => section < 3 ? 0 : Math.min(0.6, (section - 2) * 0.12);
+
+    // Ground enemies through the racket region (swing/melee them). Spacing
+    // tightens and 2-hit monsters appear more often as we progress.
+    let gx = racketX + 460;
+    while (gx < ballsX - 150) {
+      if (!nearMilestone(gx) && !nearPickup(gx)) {
+        const section = this.getLevelIndexAtX(gx);
+        const tier = Math.random() < toughChance(section) ? 2 : 1;
+        this.enemies.push({
+          type: 'ground', kind: groundKinds[gi % groundKinds.length],
+          x: gx, homeX: gx, y: groundY - 14, baseY: groundY - 14,
+          alive: true, dir: -1, range: 50, hitFlash: 0,
+          frame: (gi * 9) % 60, section, high: false, heart: null,
+          tier, hp: tier, maxHp: tier, lastSwingHit: -1
+        });
+        gi++;
+      }
+      gx += 720 - 300 * progress(gx); // ~720 early -> ~470 late
+    }
+
+    // Flying enemies in the tennis-ball region — alternate normal height and
+    // very-high (very-high need a trampoline bounce to arc a serve up to them).
+    let fx = ballsX + 340;
+    while (fx < trackEnd - 200) {
+      if (!nearMilestone(fx)) {
+        const section = this.getLevelIndexAtX(fx);
+        const high = fi % 2 === 1;
+        const baseY = high ? 165 : 290;
+        const tier = Math.random() < toughChance(section) ? 2 : 1;
+        this.enemies.push({
+          type: 'flying', kind: flyingKinds[fi % flyingKinds.length],
+          x: fx, homeX: fx, y: baseY, baseY,
+          alive: true, dir: -1, range: 70, hitFlash: 0,
+          frame: (fi * 13) % 60, section, high, heart: null,
+          tier, hp: tier, maxHp: tier, lastSwingHit: -1,
+          shootTimer: 60 + Math.floor(Math.random() * 120) // flying foes shoot back
+        });
+        if (high) {
+          this.trampolines.push({ x: fx, y: groundY, w: 58, squash: 0 });
+        }
+        fi++;
+      }
+      fx += 760 - 280 * progress(fx); // ~620 -> ~480 late
+    }
+
+    // Trampoline-gated bonus hearts floating high above the path
+    const highHeartXs = [];
+    for (let x = racketX + 760; x < ballsX - 300; x += 1650) {
+      if (!nearMilestone(x) && !nearPickup(x)) highHeartXs.push(x);
+    }
+    for (let x = ballsX + 1000; x < trackEnd - 300; x += 1650) {
+      if (!nearMilestone(x)) highHeartXs.push(x);
+    }
+    highHeartXs.forEach((x, i) => {
+      // Heart floats high AND off to one side of the pad, drifting back and
+      // forth — she must trampoline-bounce then steer forward to grab it.
+      const dir = (i % 2 === 0) ? 1 : -1;
+      const heartBaseX = x + dir * 70;
+      this.hearts.push({
+        x: heartBaseX, y: 128, width: 16, height: 16, collected: false,
+        spawned: true, fromEnemy: false, falling: false, section: this.getLevelIndexAtX(x),
+        motion: {
+          baseX: heartBaseX, baseY: 128,
+          ampX: 48, ampY: 20,
+          speed: 0.04, phase: Math.random() * Math.PI * 2
+        }
+      });
+      if (!this.trampolines.some(t => Math.abs(t.x - x) < 40)) {
+        this.trampolines.push({ x, y: groundY, w: 58, squash: 0 });
+      }
+    });
+
+    // Each enemy carries a heart that drops on defeat (counts toward the total)
+    this.enemies.forEach(e => {
+      const h = {
+        x: e.x, y: e.baseY, width: 16, height: 16, collected: false,
+        spawned: false, fromEnemy: true, falling: false, section: e.section
+      };
+      e.heart = h;
+      this.hearts.push(h);
+    });
+  },
+
   preloadPhotos() {
     this.levels.forEach(lvl => {
-      if (lvl.photo) {
+      // Support multiple photos per memory (e.g. camping). Falls back to the
+      // legacy single `photo` field if present.
+      const srcs = lvl.photos || (lvl.photo ? [lvl.photo] : []);
+      lvl.imgElements = srcs.map(src => {
         const img = new Image();
-        img.src = lvl.photo;
+        img.src = src;
         img.onerror = () => {
-          console.log(`Placeholder photo for ${lvl.name} not found, using procedural sketch instead.`);
+          console.log(`Photo for ${lvl.name} not found (${src}), using procedural sketch instead.`);
         };
-        lvl.imgElement = img;
-      }
+        return img;
+      });
     });
   },
 
@@ -502,17 +753,24 @@ const Game = {
 
     // Force updates of outfits and companions
     const frame = this.player.animFrame;
-    if (lvlIndex === 1) {
-      this.player.outfit = 'graduation';
-    } else if (lvlIndex === 5) {
-      this.player.outfit = 'wedding';
-    } else if (lvlIndex >= 9) {
-      this.player.outfit = 'hiking';
-    } else {
-      this.player.outfit = 'casual';
-    }
+    this.player.outfit = this.getEllenOutfit(lvlIndex);
 
     this.updateCompanions(lvlIndex);
+
+    // Grant the loadout appropriate to this position + restore health (dev convenience)
+    this.player.health = this.player.maxHealth;
+    this.player.invuln = 0;
+    this.player.isDead = false;
+    this.player.attackTimer = 0;
+    this.player.serveCooldown = 0;
+    if (this.player.x >= 1000) {
+      this.player.weapon = 'racket';
+      this.pickups.forEach(p => { if (p.kind === 'racket') p.collected = true; });
+    }
+    if (this.ballsX && this.player.x >= this.ballsX) {
+      this.player.hasBalls = true;
+      this.pickups.forEach(p => { p.collected = true; });
+    }
 
     // Chime BGM effect
     AudioEngine.playHeartSFX();
@@ -550,6 +808,8 @@ const Game = {
       const menu = document.getElementById('chapter-menu-overlay');
       const startScreen = document.getElementById('start-screen');
       const endingScreen = document.getElementById('ending-screen');
+      const gameOverScreen = document.getElementById('game-over-screen');
+      const secretScreen = document.getElementById('secret-screen');
 
       // If chapter menu is open, handle D-pad grid navigation
       if (menu && menu.classList.contains('active')) {
@@ -605,10 +865,35 @@ const Game = {
         }
       }
 
-      // Ending Screen enter/space trigger
+      // Ending Screen: ←/→ choose between Keep Exploring / Play Again, Enter activates
       if (endingScreen && endingScreen.classList.contains('active')) {
+        if (code === 'ArrowLeft' || code === 'ArrowRight') {
+          this.endingFocusIndex = (this.endingFocusIndex || 0) === 0 ? 1 : 0;
+          this.updateEndingFocus();
+          e.preventDefault();
+          return;
+        }
         if (code === 'Enter' || code === 'Space') {
-          document.getElementById('replay-btn').click();
+          const ids = ['keep-exploring-btn', 'replay-btn'];
+          document.getElementById(ids[this.endingFocusIndex || 0]).click();
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // Game Over Screen: Try Again
+      if (gameOverScreen && gameOverScreen.classList.contains('active')) {
+        if (code === 'Enter' || code === 'Space') {
+          document.getElementById('retry-btn').click();
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // Secret Prize Screen: replay
+      if (secretScreen && secretScreen.classList.contains('active')) {
+        if (code === 'Enter' || code === 'Space') {
+          document.getElementById('secret-replay-btn').click();
           e.preventDefault();
           return;
         }
@@ -654,6 +939,14 @@ const Game = {
       if (code === 'Space' || code === 'KeyW' || code === 'ArrowUp') {
         if (this.isRunning && !this.isPaused) {
           this.jump();
+          e.preventDefault();
+        }
+      }
+
+      // Attack: Enter (TV remote center "select"/click), F or J on keyboard
+      if (code === 'Enter' || code === 'KeyF' || code === 'KeyJ') {
+        if (this.isRunning && !this.isPaused) {
+          this.attack();
           e.preventDefault();
         }
       }
@@ -759,6 +1052,11 @@ const Game = {
       this.resetGame();
     });
 
+    // Keep Exploring Button — resume the game so she can backtrack for hearts
+    document.getElementById('keep-exploring-btn').addEventListener('click', () => {
+      this.continueExploring();
+    });
+
     // Dev HUD control
     document.getElementById('hud-dev-btn').addEventListener('click', () => {
       const devPanel = document.getElementById('dev-panel');
@@ -785,6 +1083,26 @@ const Game = {
       Assets.clearCache();
       this.updateDevPanel();
       this.canvas.focus();
+    });
+
+    // Dev Panel: jump straight to the 100% secret-prize ending
+    document.getElementById('dev-win-btn').addEventListener('click', () => {
+      this.hearts.forEach(h => { h.collected = true; h.spawned = true; h.falling = false; });
+      this.totalHearts = this.hearts.length;
+      this.heartsCollected = this.totalHearts;
+      this.updateHeartsUI();
+      this.currentLevelIndex = this.levels.length - 1;
+      document.getElementById('dev-panel').classList.remove('active');
+      this.triggerGameComplete();
+    });
+
+    // Dev Panel: jump to the normal (< 100%) ending
+    document.getElementById('dev-end-btn').addEventListener('click', () => {
+      // Leave a few hearts uncollected so it takes the normal-ending branch
+      if (this.heartsCollected >= this.totalHearts) this.heartsCollected = Math.max(0, this.totalHearts - 3);
+      this.currentLevelIndex = this.levels.length - 1;
+      document.getElementById('dev-panel').classList.remove('active');
+      this.triggerGameComplete();
     });
 
     // Mobile buttons touch bindings
@@ -815,6 +1133,32 @@ const Game = {
     handleTouchStart(leftBtn, 'ArrowLeft');
     handleTouchStart(rightBtn, 'ArrowRight');
     handleTouchStart(jumpBtn, 'KeyW');
+
+    // Mobile attack button
+    const attackBtn = document.getElementById('btn-attack');
+    if (attackBtn) {
+      const doAttack = (e) => {
+        if (e) e.preventDefault();
+        if (this.isRunning && !this.isPaused) this.attack();
+      };
+      attackBtn.addEventListener('touchstart', doAttack);
+      attackBtn.addEventListener('mousedown', doAttack);
+    }
+
+    // Game Over: Try Again button
+    const retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => this.respawnSection());
+    }
+
+    // Secret Prize: replay button
+    const secretReplayBtn = document.getElementById('secret-replay-btn');
+    if (secretReplayBtn) {
+      secretReplayBtn.addEventListener('click', () => {
+        document.getElementById('secret-screen').classList.remove('active');
+        this.resetGame();
+      });
+    }
   },
 
   updateDevPanel() {
@@ -866,12 +1210,17 @@ const Game = {
   },
 
   startGame() {
-    this.isRunning = true;
     this.canvas.focus();
-    this.loop();
+    this.ensureLoop();
   },
 
   resetGame() {
+    // Hide any end-state overlays
+    ['ending-screen', 'game-over-screen', 'secret-screen'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('active');
+    });
+
     if (wasmExports) {
       wasmExports.initPlayer(150, this.height - 80);
       this.player.x = wasmExports.player_x.value;
@@ -892,11 +1241,10 @@ const Game = {
     this.camera.x = 0;
     this.currentLevelIndex = 0;
     this.isPaused = false;
-    this.isRunning = true;
     this.isQuizCompleted = false;
 
     this.setupWorld();
-    this.loop();
+    this.ensureLoop();
   },
 
   jump() {
@@ -927,6 +1275,57 @@ const Game = {
       return this.levels.length - 1;
     }
     return 0;
+  },
+
+  // Per-level outfit for Ellen (array index = level index in levelsData)
+  // 0: Dating, 1: Graduation, 2: Mochi, 3: First Home, 4: Engagement,
+  // 5: Wedding, 6: Preston, 7: 2nd House, 8: Blaire, 9: RV Camping, 10: Mt Fuji
+  getEllenOutfit(lvlIdx) {
+    const outfits = [
+      'date_dress',     // 0 - Started Dating
+      'graduation',     // 1 - Graduation
+      'casual',         // 2 - Adopting Mochi
+      'sundress',       // 3 - First Home
+      'engagement_dress', // 4 - The Engagement
+      'wedding',        // 5 - Our Wedding Day
+      'mom_casual',     // 6 - Welcoming Preston
+      'casual',         // 7 - Moving to 2nd House
+      'mom_casual',     // 8 - Welcoming Blaire
+      'hiking',         // 9 - RV Camping
+      'hiking',         // 10 - Mt Fuji
+    ];
+    return outfits[lvlIdx] || 'casual';
+  },
+
+  // Per-level outfit for Barney (husband)
+  getHusbandOutfit(lvlIdx) {
+    const outfits = [
+      'red_vneck',      // 0 - Started Dating
+      'graduation',     // 1 - Graduation
+      'casual',         // 2 - Adopting Mochi
+      'flannel',        // 3 - First Home
+      'suit',           // 4 - The Engagement
+      'tuxedo',         // 5 - Our Wedding Day
+      'dad_casual',     // 6 - Welcoming Preston
+      'casual',         // 7 - Moving to 2nd House
+      'dad_casual',     // 8 - Welcoming Blaire
+      'hiking',         // 9 - RV Camping
+      'hiking',         // 10 - Mt Fuji
+    ];
+    return outfits[lvlIdx] || 'casual';
+  },
+
+  // Year shown in the HUD. Flips to a milestone's year slightly BEFORE the
+  // player arrives, so the final stretch reads ...2024 → 2025 → 2026 before the
+  // Mt. Fuji dialogue fires (otherwise the last year is never visible because
+  // its milestone sits at the very end of the map where the game completes).
+  getDisplayYear(x) {
+    const lead = 350; // px of anticipation before a milestone
+    let year = this.levels[0].year;
+    for (let i = 0; i < this.levels.length; i++) {
+      if (x >= this.levels[i].x - lead) year = this.levels[i].year;
+    }
+    return year;
   },
 
   getSkyColors(x) {
@@ -1030,15 +1429,7 @@ const Game = {
 
     // Set Ellen's outfit based on current level milestone reached
     const lvlIdx = this.getLevelIndexAtX(this.player.x);
-    if (lvlIdx === 1) {
-      this.player.outfit = 'graduation';
-    } else if (lvlIdx === 5) {
-      this.player.outfit = 'wedding';
-    } else if (lvlIdx >= 9) {
-      this.player.outfit = 'hiking';
-    } else {
-      this.player.outfit = 'casual';
-    }
+    this.player.outfit = this.getEllenOutfit(lvlIdx);
 
     // --- COMPANION TRAIL ENGINE ---
     // Handle Dog, Husband and Kids following Ellen in a chain
@@ -1054,7 +1445,7 @@ const Game = {
 
     // Check collectible Heart collisions
     this.hearts.forEach(heart => {
-      if (!heart.collected) {
+      if (!heart.collected && heart.spawned !== false) {
         let isColliding = false;
         if (wasmExports) {
           isColliding = wasmExports.checkHeartCollision(heart.x, heart.y) !== 0;
@@ -1068,6 +1459,13 @@ const Game = {
           this.heartsCollected++;
           this.updateHeartsUI();
           AudioEngine.playHeartSFX();
+
+          // If she's backtracking after the finish and just grabbed the last
+          // heart, reward the secret prize right away.
+          if (this.allowSecretOnCollect && this.totalHearts > 0 && this.heartsCollected >= this.totalHearts) {
+            this.allowSecretOnCollect = false;
+            this.showSecretPrize();
+          }
         }
       }
     });
@@ -1102,6 +1500,361 @@ const Game = {
         this.triggerMilestone(idx);
       }
     });
+
+    // Combat systems (pickups, enemies, projectiles, trampolines, damage)
+    this.updateCombat();
+  },
+
+  // ============================================================
+  // COMBAT SYSTEMS
+  // ============================================================
+  attack() {
+    if (!this.isRunning || this.isPaused || this.player.isDead) return;
+    if (!this.player.weapon) return;            // no racket yet
+    if (this.player.attackTimer > 0) return;    // mid-swing
+
+    // Swing the racket (melee — resolved each active frame in updateCombat)
+    this.player.attackTimer = this.combat.swingDuration;
+    this._swingId = (this._swingId || 0) + 1; // so one swing damages an enemy once
+    AudioEngine.playSlashSFX();
+
+    // Once she's picked up the tennis balls, the same swing serves an arcing ball
+    if (this.player.hasBalls && this.player.serveCooldown <= 0) {
+      this.player.serveCooldown = this.combat.serveCooldown;
+      this.serveBall();
+      AudioEngine.playShootSFX();
+    }
+  },
+
+  serveBall() {
+    const dir = this.player.dir;
+    this.projectiles.push({
+      x: this.player.x + dir * 20,
+      y: this.player.y - 36,
+      vx: dir * this.combat.ballSpeedX,
+      vy: this.combat.ballSpeedY, // launches upward, gravity arcs it back down
+      spin: 0,
+      bounced: false,
+      dir,
+      alive: true
+    });
+  },
+
+  // Apply damage to an enemy. Tougher (2-hit) monsters flash when hurt but
+  // survive until their hp runs out.
+  hitEnemy(e, dmg) {
+    if (!e.alive) return;
+    e.hp -= dmg;
+    if (e.hp <= 0) {
+      this.defeatEnemy(e);
+    } else {
+      e.hitFlash = 12; // white flash = "ouch, but still standing"
+      AudioEngine.playEnemyHurtSFX();
+    }
+  },
+
+  defeatEnemy(e) {
+    if (!e.alive) return;
+    e.alive = false;
+    e.hitFlash = 0;
+    this.poofs.push({ x: e.x, y: e.y, progress: 0 });
+    AudioEngine.playEnemyDefeatSFX();
+    // Drop its heart (pops up, then falls to the ground)
+    if (e.heart && !e.heart.collected) {
+      e.heart.spawned = true;
+      e.heart.falling = true;
+      e.heart.x = e.x;
+      e.heart.y = e.y;
+      e.heart.vy = -5;
+    }
+  },
+
+  damagePlayer() {
+    if (this.player.invuln > 0 || this.player.isDead) return;
+    this.player.health -= 1;
+    this.player.invuln = this.combat.invulnFrames;
+    AudioEngine.playHurtSFX();
+    // Knockback away from facing direction
+    const kb = -this.player.dir * 6;
+    this.player.vx = kb;
+    if (wasmExports) wasmExports.player_vx.value = kb;
+    if (this.player.health <= 0) {
+      this.player.health = 0;
+      this.triggerGameOver();
+    }
+  },
+
+  updateCombat() {
+    const groundY = this.height - 80;
+
+    // Drift wobbling hearts (so a straight vertical jump won't always catch them)
+    this._heartClock = (this._heartClock || 0) + 1;
+    const hc = this._heartClock;
+    this.hearts.forEach(h => {
+      if (h.motion && !h.falling && !h.collected) {
+        h.x = h.motion.baseX + Math.sin(hc * h.motion.speed + h.motion.phase) * h.motion.ampX;
+        h.y = h.motion.baseY + Math.cos(hc * h.motion.speed + h.motion.phase) * h.motion.ampY;
+      }
+    });
+
+    // Tick player timers
+    if (this.player.attackTimer > 0) this.player.attackTimer--;
+    if (this.player.serveCooldown > 0) this.player.serveCooldown--;
+    if (this.player.invuln > 0) this.player.invuln--;
+    if (this.banner && this.banner.timer > 0) this.banner.timer--;
+
+    // --- Pickups (tennis racket, then tennis balls) ---
+    this.pickups.forEach(pk => {
+      if (pk.collected) return;
+      pk.frame++;
+      if (Math.abs(pk.x - this.player.x) < 32 && Math.abs(pk.y - this.player.y) < 72) {
+        pk.collected = true;
+        AudioEngine.playPickupSFX();
+        if (pk.kind === 'racket') {
+          this.player.weapon = 'racket';
+          this.banner = {
+            timer: 240,
+            text: '🎾 Tennis racket! Press SELECT / Enter to swing at the monsters'
+          };
+        } else if (pk.kind === 'balls') {
+          this.player.hasBalls = true;
+          this.banner = {
+            timer: 240,
+            text: '🎾 Tennis balls! Your swing now serves an arcing ball — jump & serve at the clouds'
+          };
+        }
+      }
+    });
+
+    // --- Trampolines (super-bounce) ---
+    this.trampolines.forEach(t => {
+      if (t.squash > 0) t.squash *= 0.8;
+      const onPadX = Math.abs(this.player.x - t.x) < t.w / 2;
+      if (onPadX && this.player.vy >= 0 && this.player.y >= t.y - 14 && this.player.y <= t.y + 8) {
+        this.player.vy = this.combat.trampolineForce;
+        this.player.y = t.y - 16;
+        this.player.isGrounded = false;
+        if (wasmExports) {
+          wasmExports.player_vy.value = this.combat.trampolineForce;
+          wasmExports.player_y.value = t.y - 16;
+          wasmExports.player_isGrounded.value = 0;
+        }
+        t.squash = 1;
+        AudioEngine.playBounceSFX();
+      }
+    });
+
+    // --- Enemies: movement + contact damage ---
+    const playerMidY = this.player.y - 28;
+    this.enemies.forEach(e => {
+      if (e.hitFlash > 0) e.hitFlash--;
+      if (!e.alive) return;
+      e.frame++;
+      e.dir = (this.player.x < e.x) ? -1 : 1;
+      if (e.type === 'ground') {
+        e.x = e.homeX + Math.sin(e.frame * 0.03) * e.range;
+      } else {
+        e.y = e.baseY + Math.sin(e.frame * 0.05) * 14;
+        e.x = e.homeX + Math.sin(e.frame * 0.02) * 30;
+        // Flying foes shoot projectiles aimed at Ellen
+        if (e.shootTimer !== undefined) {
+          e.shootTimer--;
+          const dxp = this.player.x - e.x;
+          if (e.shootTimer <= 0 && !this.player.isDead && Math.abs(dxp) < this.combat.enemyShootRange) {
+            const dyp = playerMidY - e.y;
+            const dist = Math.hypot(dxp, dyp) || 1;
+            const sp = this.combat.enemyBulletSpeed;
+            this.enemyProjectiles.push({
+              x: e.x, y: e.y,
+              vx: (dxp / dist) * sp,
+              vy: (dyp / dist) * sp,
+              kind: e.kind, frame: 0, alive: true
+            });
+            e.shootTimer = this.combat.enemyShootMin +
+              Math.floor(Math.random() * (this.combat.enemyShootMax - this.combat.enemyShootMin));
+          }
+        }
+      }
+      // Contact damage
+      if (Math.abs(e.x - this.player.x) < 24 && Math.abs(e.y - playerMidY) < 30) {
+        this.damagePlayer();
+      }
+    });
+
+    // --- Racket swing hit resolution (ground enemies only) ---
+    // One swing damages a given enemy at most once (guarded by swing id), so a
+    // 2-hit monster survives a single swing.
+    if (this.player.weapon === 'racket' && this.player.attackTimer > 0) {
+      const reach = this.combat.swingReach;
+      const dir = this.player.dir;
+      this.enemies.forEach(e => {
+        if (!e.alive || e.type !== 'ground') return;
+        if (e.lastSwingHit === this._swingId) return;
+        const dx = (e.x - this.player.x) * dir; // >0 = in front
+        if (dx > -12 && dx < reach && Math.abs(e.y - playerMidY) < 48) {
+          e.lastSwingHit = this._swingId;
+          this.hitEnemy(e, 1);
+        }
+      });
+    }
+
+    // --- Tennis balls (player's serves): arc under gravity, bounce once ---
+    this.projectiles.forEach(p => {
+      if (!p.alive) return;
+      p.vy += this.combat.ballGravity;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.spin = (p.spin || 0) + p.vx * 0.06;
+      // single ground bounce, then it rolls out and expires
+      if (p.y > groundY - 4) {
+        if (!p.bounced) {
+          p.bounced = true;
+          p.y = groundY - 4;
+          p.vy = -Math.abs(p.vy) * 0.55;
+          p.vx *= 0.8;
+        } else {
+          p.alive = false;
+          return;
+        }
+      }
+      if (p.x < this.camera.x - 80 || p.x > this.camera.x + this.width + 80) {
+        p.alive = false;
+        return;
+      }
+      this.enemies.forEach(e => {
+        if (!e.alive) return;
+        if (Math.abs(e.x - p.x) < 20 && Math.abs(e.y - p.y) < 24) {
+          this.hitEnemy(e, 1);
+          p.alive = false;
+        }
+      });
+    });
+    if (this.projectiles.length) {
+      this.projectiles = this.projectiles.filter(p => p.alive);
+    }
+
+    // --- Enemy projectiles (damage the player on hit) ---
+    this.enemyProjectiles.forEach(p => {
+      if (!p.alive) return;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.frame++;
+      if (p.y > groundY + 6 || p.y < -50 ||
+          p.x < this.camera.x - 80 || p.x > this.camera.x + this.width + 80) {
+        p.alive = false;
+        return;
+      }
+      if (Math.abs(p.x - this.player.x) < 20 && Math.abs(p.y - playerMidY) < 28) {
+        p.alive = false;
+        this.damagePlayer();
+      }
+    });
+    if (this.enemyProjectiles.length) {
+      this.enemyProjectiles = this.enemyProjectiles.filter(p => p.alive);
+    }
+
+    // --- Dropped hearts fall to the ground ---
+    this.hearts.forEach(h => {
+      if (h.falling) {
+        h.vy += 0.5;
+        h.y += h.vy;
+        const restY = groundY - 16;
+        if (h.y >= restY) {
+          h.y = restY;
+          h.falling = false;
+          h.vy = 0;
+        }
+      }
+    });
+
+    // --- Defeat puffs ---
+    if (this.poofs.length) {
+      this.poofs.forEach(pf => pf.progress += 0.08);
+      this.poofs = this.poofs.filter(pf => pf.progress < 1);
+    }
+  },
+
+  triggerGameOver() {
+    this.player.isDead = true;
+    this.isPaused = true;
+    AudioEngine.playGameOverSFX();
+    setTimeout(() => {
+      const el = document.getElementById('game-over-screen');
+      if (el) el.classList.add('active');
+    }, 700);
+  },
+
+  // Try Again: respawn at the current section's milestone with full health.
+  // Enemies/hearts in this section and ahead are reset so the section is replayable.
+  respawnSection() {
+    const over = document.getElementById('game-over-screen');
+    if (over) over.classList.remove('active');
+
+    const sec = this.getLevelIndexAtX(this.player.x);
+
+    this.enemies.forEach(e => {
+      if (e.section >= sec) {
+        e.alive = true;
+        e.hitFlash = 0;
+        e.hp = e.maxHp;
+        e.lastSwingHit = -1;
+        if (e.heart) {
+          e.heart.spawned = false;
+          e.heart.collected = false;
+          e.heart.falling = false;
+        }
+      }
+    });
+    this.hearts.forEach(h => {
+      if (h.section >= sec && !h.fromEnemy) {
+        h.collected = false;
+      }
+    });
+    this.projectiles = [];
+    this.enemyProjectiles = [];
+    this.poofs = [];
+    this.heartsCollected = this.hearts.filter(h => h.collected).length;
+
+    this.player.health = this.player.maxHealth;
+    this.player.isDead = false;
+    this.player.invuln = this.combat.invulnFrames;
+    this.player.attackTimer = 0;
+    this.player.serveCooldown = 0;
+
+    const targetX = Math.max(700, this.levels[sec].x - 120);
+    if (wasmExports) {
+      wasmExports.initPlayer(targetX, this.height - 80);
+      this.player.x = wasmExports.player_x.value;
+      this.player.y = wasmExports.player_y.value;
+      this.player.vx = wasmExports.player_vx.value;
+      this.player.vy = wasmExports.player_vy.value;
+      this.player.isGrounded = wasmExports.player_isGrounded.value !== 0;
+      this.player.dir = wasmExports.player_dir.value;
+    } else {
+      this.player.x = targetX;
+      this.player.vx = 0;
+      this.player.vy = 0;
+    }
+    this.camera.x = Math.max(0, this.player.x - this.width / 3);
+    this.currentLevelIndex = sec; // don't re-trigger this milestone's dialogue
+    this.isPaused = false;
+    this.updateHeartsUI();
+    this.canvas.focus();
+  },
+
+  confirmGamepadScreen() {
+    const click = (id) => { const el = document.getElementById(id); if (el) el.click(); };
+    const isActive = (id) => {
+      const el = document.getElementById(id);
+      return el && el.classList.contains('active');
+    };
+    if (isActive('start-screen')) click('start-btn');
+    else if (isActive('game-over-screen')) click('retry-btn');
+    else if (isActive('secret-screen')) click('secret-replay-btn');
+    else if (isActive('ending-screen')) {
+      const ids = ['keep-exploring-btn', 'replay-btn'];
+      click(ids[this.endingFocusIndex || 0]);
+    }
   },
 
   updateCompanions(lvlIdx) {
@@ -1109,30 +1862,40 @@ const Game = {
     const frame = this.player.animFrame;
     const speed = Math.abs(this.player.vx);
     const isMoving = speed > 0.5;
+    const groundY = this.height - 80;
+
+    // Record Ellen's vertical jump offset each frame so the whole family can
+    // echo the hop on a short delay — a conga-line ripple where she leads and
+    // each follower jumps a few frames later based on how far back it trails.
+    // When grounded the offset is 0, so this is a no-op until she jumps.
+    const jumpOffset = this.player.y - groundY;
+    if (!this.player.yHistory) this.player.yHistory = [];
+    this.player.yHistory.unshift(jumpOffset);
+    if (this.player.yHistory.length > 24) this.player.yHistory.pop();
+    const echoY = (delayFrames) => {
+      const h = this.player.yHistory;
+      return groundY + (h[Math.min(delayFrames, h.length - 1)] || 0);
+    };
 
     // 1. Dog joins once we've adopted Mochi (index 2) onward
     if (lvlIdx >= 2) {
       this.companions.push({
         type: 'dog',
         x: this.player.x - 55 * this.player.dir,
-        y: this.height - 80,
+        y: echoY(6),
         outfit: 'casual',
         frame: frame,
         dir: this.player.dir
       });
     }
 
-    // 2. Husband joins at the Wedding milestone (index 5) onward
-    if (lvlIdx >= 5) {
-      let husbandOutfit = 'casual';
-      if (lvlIdx === 5) husbandOutfit = 'tuxedo';
-      if (lvlIdx >= 9) husbandOutfit = 'hiking';
-
+    // 2. Husband (Barney) joins at the Dating milestone (index 0) onward
+    if (this.player.x >= this.levels[0].x) {
       this.companions.push({
         type: 'husband',
         x: this.player.x - 30 * this.player.dir,
-        y: this.height - 80,
-        outfit: husbandOutfit,
+        y: echoY(3),
+        outfit: this.getHusbandOutfit(lvlIdx),
         frame: frame,
         dir: this.player.dir
       });
@@ -1150,7 +1913,7 @@ const Game = {
       this.companions.push({
         type: kidType,
         x: this.player.x - offset * this.player.dir,
-        y: this.height - 80,
+        y: echoY(9),
         outfit: 'casual',
         frame: frame,
         dir: this.player.dir
@@ -1170,7 +1933,7 @@ const Game = {
       this.companions.push({
         type: kid2Type,
         x: this.player.x - offset * this.player.dir,
-        y: this.height - 80,
+        y: echoY(12),
         outfit: 'casual',
         frame: frame,
         dir: this.player.dir
@@ -1234,8 +1997,9 @@ const Game = {
   },
 
   triggerGameComplete() {
+    // Keep the loop alive (isRunning stays true) so the celebration fireworks
+    // play behind the overlay AND so "Keep Exploring" can resume instantly.
     this.isPaused = true;
-    this.isRunning = false;
 
     if (wasmExports) {
       wasmExports.initParticles();
@@ -1245,10 +2009,56 @@ const Game = {
     // Win sound chime
     AudioEngine.playWinSFX();
 
+    // Did she collect EVERY heart? That unlocks the secret prize.
+    const allHearts = this.totalHearts > 0 && this.heartsCollected >= this.totalHearts;
+
     // Show ending UI overlay after a short delay
     setTimeout(() => {
-      document.getElementById('ending-screen').classList.add('active');
+      if (allHearts) {
+        this.showSecretPrize();
+      } else {
+        const missing = this.totalHearts - this.heartsCollected;
+        const hint = document.getElementById('ending-hearts-hint');
+        if (hint) {
+          hint.textContent = `💗 You found ${this.heartsCollected} of ${this.totalHearts} hearts. Collect them ALL for a special secret prize — choose “Keep Exploring” to go back for the ${missing} you missed!`;
+        }
+        this.endingFocusIndex = 0;
+        document.getElementById('ending-screen').classList.add('active');
+        this.updateEndingFocus();
+      }
     }, 1500);
+  },
+
+  // Resume play after finishing so she can backtrack and collect missed hearts.
+  continueExploring() {
+    document.getElementById('ending-screen').classList.remove('active');
+    this.isPaused = false;
+    // Now that she's finished, grabbing the final heart pops the secret prize.
+    this.allowSecretOnCollect = true;
+    this.ensureLoop();
+    this.canvas.focus();
+  },
+
+  // Shows the golden 100%-completion reward (from the finish line OR from
+  // collecting the last heart while backtracking).
+  showSecretPrize() {
+    this.isPaused = true;
+    if (wasmExports) {
+      wasmExports.initParticles();
+    }
+    this.fireworks = [];
+    AudioEngine.playWinSFX();
+    setTimeout(() => {
+      document.getElementById('secret-screen').classList.add('active');
+    }, 800);
+  },
+
+  updateEndingFocus() {
+    const ids = ['keep-exploring-btn', 'replay-btn'];
+    ids.forEach((id, i) => {
+      const b = document.getElementById(id);
+      if (b) b.classList.toggle('focused', i === (this.endingFocusIndex || 0));
+    });
   },
 
   // Renders the background scenery, hills and ground
@@ -1425,13 +2235,63 @@ const Game = {
       }
     });
 
+    // Draw trampolines (bounce pads)
+    this.trampolines.forEach(t => {
+      const rx = t.x - camX;
+      if (rx > -60 && rx < this.width + 60) {
+        Assets.drawTrampoline(this.ctx, rx, t.y, t.w, t.squash);
+      }
+    });
+
+    // Draw weapon pickups
+    this.pickups.forEach(pk => {
+      if (pk.collected) return;
+      const rx = pk.x - camX;
+      if (rx > -60 && rx < this.width + 60) {
+        Assets.drawWeaponPickup(this.ctx, rx, pk.y, pk.kind, pk.frame);
+      }
+    });
+
     // Draw hearts collectibles
     this.hearts.forEach(heart => {
-      if (!heart.collected) {
+      if (!heart.collected && heart.spawned !== false) {
         const rx = heart.x - camX;
         if (rx > -50 && rx < this.width + 50) {
           Assets.drawHeart(this.ctx, rx, heart.y, this.player.animFrame);
         }
+      }
+    });
+
+    // Draw enemies (tougher 2-hit monsters render bigger + show hp pips)
+    this.enemies.forEach(e => {
+      if (!e.alive) return;
+      const rx = e.x - camX;
+      if (rx > -70 && rx < this.width + 70) {
+        Assets.drawEnemy(this.ctx, rx, e.y, e.kind, e.frame, e.dir, e.hitFlash, e.tier, e.hp, e.maxHp);
+      }
+    });
+
+    // Draw projectiles (player's served tennis balls)
+    this.projectiles.forEach(p => {
+      const rx = p.x - camX;
+      if (rx > -30 && rx < this.width + 30) {
+        Assets.drawBullet(this.ctx, rx, p.y, p.dir, p.spin);
+      }
+    });
+
+    // Draw enemy projectiles
+    this.enemyProjectiles.forEach(p => {
+      const rx = p.x - camX;
+      if (rx > -30 && rx < this.width + 30) {
+        Assets.drawEnemyBullet(this.ctx, rx, p.y, p.kind, p.frame);
+      }
+    });
+
+    // Draw defeat puffs
+    this.poofs.forEach(pf => {
+      const rx = pf.x - camX;
+      if (rx > -40 && rx < this.width + 40) {
+        Assets.drawPoof(this.ctx, rx, pf.y, pf.progress);
       }
     });
 
@@ -1451,16 +2311,34 @@ const Game = {
       }
     });
 
-    // Draw Ellen
+    // Draw Ellen (blinks while invulnerable just after taking a hit)
     const pX = this.player.x - camX;
-    Assets.drawEllen(
-      this.ctx,
-      pX,
-      this.player.y,
-      this.player.outfit,
-      this.player.animFrame,
-      this.player.dir
-    );
+    const blink = this.player.invuln > 0 && Math.floor(this.player.invuln / 4) % 2 === 0;
+    if (!blink) {
+      Assets.drawEllen(
+        this.ctx,
+        pX,
+        this.player.y,
+        this.player.outfit,
+        this.player.animFrame,
+        this.player.dir
+      );
+
+      // Racket held in hand (sways with her stride, swings on attack)
+      if (this.player.weapon) {
+        const swing = this.player.attackTimer > 0
+          ? 1 - this.player.attackTimer / this.combat.swingDuration
+          : 0;
+        const moving = Math.abs(this.player.vx) > 0.5;
+        Assets.drawHeldWeapon(this.ctx, pX, this.player.y, this.player.weapon, this.player.dir, swing, this.player.animFrame, moving);
+      }
+
+      // Racket swing arc effect
+      if (this.player.weapon === 'racket' && this.player.attackTimer > 0) {
+        const prog = 1 - this.player.attackTimer / this.combat.swingDuration;
+        Assets.drawSlash(this.ctx, pX + this.player.dir * 14, this.player.y - 30, this.player.dir, prog);
+      }
+    }
 
     // HUD overlays rendered on canvas
     this.drawHUD();
@@ -1486,7 +2364,6 @@ const Game = {
     this.ctx.fillText(`${this.heartsCollected} / ${this.totalHearts}`, 76, 45);
 
     // Current Year Indicator in top center
-    const lvl = this.levels[this.getLevelIndexAtX(this.player.x)];
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     this.ctx.fillRect(this.width / 2 - 60, 20, 120, 30);
     this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
@@ -1495,7 +2372,49 @@ const Game = {
     this.ctx.fillStyle = '#ffffff';
     this.ctx.font = '600 15px Outfit';
     this.ctx.textAlign = 'center';
-    this.ctx.fillText(lvl.year, this.width / 2, 41);
+    this.ctx.fillText(this.getDisplayYear(this.player.x), this.width / 2, 41);
+
+    // --- Health bar (segmented) ---
+    const hbX = 42, hbY = 66, hbW = 116, hbH = 11;
+    this.ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    this.ctx.fillRect(hbX - 6, hbY - 5, hbW + 12, hbH + 10);
+    const segW = hbW / this.player.maxHealth;
+    for (let i = 0; i < this.player.maxHealth; i++) {
+      this.ctx.fillStyle = i < this.player.health ? '#ff4d6d' : 'rgba(255,255,255,0.18)';
+      this.ctx.fillRect(hbX + i * segW + 1, hbY, segW - 2, hbH);
+    }
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '700 9px Outfit';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText('HP', hbX - 4, hbY - 7);
+
+    // --- Weapon badge ---
+    if (this.player.weapon) {
+      const wName = this.player.hasBalls ? 'Racket + Balls' : 'Racket';
+      this.ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      this.ctx.fillRect(hbX - 6, hbY + 14, this.player.hasBalls ? 128 : 86, 22);
+      this.ctx.font = '14px Outfit';
+      this.ctx.textAlign = 'left';
+      this.ctx.fillText('🎾', hbX - 2, hbY + 30);
+      this.ctx.fillStyle = '#fff';
+      this.ctx.font = '600 12px Outfit';
+      this.ctx.fillText(wName, hbX + 20, hbY + 30);
+    }
+
+    // --- Pickup / tip banner ---
+    if (this.banner && this.banner.timer > 0) {
+      const a = Math.min(1, this.banner.timer / 40);
+      this.ctx.save();
+      this.ctx.globalAlpha = a;
+      this.ctx.textAlign = 'center';
+      this.ctx.font = '700 16px Outfit';
+      const tw = this.ctx.measureText(this.banner.text).width;
+      this.ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      this.ctx.fillRect(this.width / 2 - tw / 2 - 14, 60, tw + 28, 30);
+      this.ctx.fillStyle = '#ffe066';
+      this.ctx.fillText(this.banner.text, this.width / 2, 80);
+      this.ctx.restore();
+    }
   },
 
   // Final celebration fireworks system
@@ -1574,8 +2493,20 @@ const Game = {
     }
   },
 
+  // Starts the render loop only if one isn't already running (prevents a
+  // second concurrent requestAnimationFrame chain / double-speed game).
+  ensureLoop() {
+    if (this._loopRunning) return;
+    this.isRunning = true;
+    this.loop();
+  },
+
   loop() {
-    if (!this.isRunning) return;
+    if (!this.isRunning) {
+      this._loopRunning = false;
+      return;
+    }
+    this._loopRunning = true;
 
     // FPS calculation
     const now = performance.now();
@@ -1635,15 +2566,24 @@ const Game = {
       this.keys['ArrowLeft'] = axeX < -0.3 || dpadLeft;
       this.keys['ArrowRight'] = axeX > 0.3 || dpadRight;
 
-      const btnA = gp.buttons[0] ? gp.buttons[0].pressed : false;
+      // Jump: D-pad up or left stick up
+      const axeY = gp.axes[1] || 0;
       const dpadUp = gp.buttons[12] ? gp.buttons[12].pressed : false;
-      
-      if (btnA || dpadUp) {
-        if (this.isRunning && !this.isPaused) {
-          this.jump();
-        } else if (this.isPaused && this.activeDialog) {
-          if (!this.gamepadBtnAPressed) {
+      if ((dpadUp || axeY < -0.5) && this.isRunning && !this.isPaused) {
+        this.jump();
+      }
+
+      // Attack / confirm: A (center select on TV remotes) or X — edge-triggered
+      const btnA = gp.buttons[0] ? gp.buttons[0].pressed : false;
+      const btnX = gp.buttons[2] ? gp.buttons[2].pressed : false;
+      if (btnA || btnX) {
+        if (!this.gamepadBtnAPressed) {
+          if (this.isRunning && !this.isPaused) {
+            this.attack();
+          } else if (this.isPaused && this.activeDialog) {
             this.advanceDialogue();
+          } else {
+            this.confirmGamepadScreen();
           }
         }
         this.gamepadBtnAPressed = true;

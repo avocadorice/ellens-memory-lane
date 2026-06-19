@@ -9,3 +9,7 @@ linkedin/*.HEIC
 linkedin/*.heic
 linkedin/*.webp
 linkedin/*.png
+
+# HEIC photo originals — keep local, not browser-renderable / not for public Pages
+photos/*.HEIC
+photos/*.heic

@@ -131,6 +131,80 @@ const Assets = {
       // Pants
       ctx.fillStyle = '#3d5a80'; // blue jeans
       ctx.fillRect(-12, -27 + bounce * 0.3, 24, 13);
+    } else if (outfit === 'date_dress') {
+      // Flowy coral/rose date dress
+      ctx.fillStyle = '#e76f8a';
+      ctx.beginPath();
+      ctx.moveTo(-11, -45);
+      ctx.lineTo(11, -45);
+      ctx.lineTo(16, -10);
+      ctx.lineTo(-16, -10);
+      ctx.closePath();
+      ctx.fill();
+      // Sash belt
+      ctx.fillStyle = '#c44569';
+      ctx.fillRect(-12, -30 + bounce * 0.3, 24, 3);
+      // White lace trim at hem
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      for (let i = -16; i <= 16; i += 6) {
+        ctx.beginPath();
+        ctx.arc(i, -10, 3, 0, Math.PI, true);
+        ctx.fill();
+      }
+    } else if (outfit === 'sundress') {
+      // Yellow sundress for first home
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.moveTo(-11, -45);
+      ctx.lineTo(11, -45);
+      ctx.lineTo(18, -8);
+      ctx.lineTo(-18, -8);
+      ctx.closePath();
+      ctx.fill();
+      // Floral pattern dots
+      ctx.fillStyle = '#f4845f';
+      [[-5,-38],[4,-35],[-2,-25],[6,-28],[0,-18]].forEach(([dx,dy]) => {
+        ctx.beginPath();
+        ctx.arc(dx, dy + bounce * 0.3, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // Thin straps
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-6, -45); ctx.lineTo(-6, -50);
+      ctx.moveTo(6, -45); ctx.lineTo(6, -50);
+      ctx.stroke();
+    } else if (outfit === 'engagement_dress') {
+      // Elegant blush/champagne dress
+      ctx.fillStyle = '#f5cac3';
+      ctx.beginPath();
+      ctx.moveTo(-12, -45);
+      ctx.lineTo(12, -45);
+      ctx.lineTo(20, -6);
+      ctx.lineTo(-20, -6);
+      ctx.closePath();
+      ctx.fill();
+      // Sparkle details
+      ctx.fillStyle = 'rgba(255,215,0,0.6)';
+      [[-4,-40],[5,-36],[-6,-28],[3,-22],[0,-14]].forEach(([dx,dy]) => {
+        ctx.beginPath();
+        ctx.arc(dx, dy + bounce * 0.3, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // Thin waist ribbon
+      ctx.fillStyle = '#e8a598';
+      ctx.fillRect(-12, -30 + bounce * 0.3, 24, 2.5);
+    } else if (outfit === 'mom_casual') {
+      // Cozy lavender cardigan over white tee
+      ctx.fillStyle = '#b8c0ff'; // lavender cardigan
+      ctx.fillRect(-13, -45 + bounce * 0.3, 26, 19);
+      // White tee peek
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-6, -45 + bounce * 0.3, 12, 6);
+      // Comfy dark leggings
+      ctx.fillStyle = '#2d3142';
+      ctx.fillRect(-12, -26 + bounce * 0.3, 24, 12);
     } else if (outfit === 'hiking') {
       // Green jacket
       ctx.fillStyle = '#4f7a30';
@@ -144,7 +218,12 @@ const Assets = {
     }
 
     // --- ARMS ---
-    ctx.fillStyle = outfit === 'wedding' ? '#ffffff' : (outfit === 'graduation' ? '#1e1e24' : '#fecfef');
+    ctx.fillStyle = outfit === 'wedding' ? '#ffffff' :
+                   (outfit === 'graduation' ? '#1e1e24' :
+                   (outfit === 'mom_casual' ? '#b8c0ff' :
+                   (outfit === 'engagement_dress' ? '#f5cac3' :
+                   (outfit === 'date_dress' ? '#e76f8a' :
+                   (outfit === 'sundress' ? '#ffd166' : '#fecfef')))));
     // Arm 1 (back)
     ctx.save();
     ctx.translate(-10, -42 + bounce * 0.3);
@@ -161,7 +240,12 @@ const Assets = {
     ctx.save();
     ctx.translate(10, -42 + bounce * 0.3);
     ctx.rotate(walkCycle * 0.3);
-    ctx.fillStyle = outfit === 'wedding' ? '#ffffff' : (outfit === 'graduation' ? '#1e1e24' : '#fecfef');
+    ctx.fillStyle = outfit === 'wedding' ? '#ffffff' :
+                   (outfit === 'graduation' ? '#1e1e24' :
+                   (outfit === 'mom_casual' ? '#b8c0ff' :
+                   (outfit === 'engagement_dress' ? '#f5cac3' :
+                   (outfit === 'date_dress' ? '#e76f8a' :
+                   (outfit === 'sundress' ? '#ffd166' : '#fecfef')))));
     ctx.fillRect(-3, 0, 6, 18);
     // Hand
     ctx.fillStyle = '#ffd1ac';
@@ -173,7 +257,7 @@ const Assets = {
     // --- HEAD & FACE ---
     ctx.fillStyle = '#ffd1ac'; // Skin tone
     // --- HAIR: Back hair length (drawn behind the face skin) ---
-    ctx.fillStyle = '#2b1d1d';
+    ctx.fillStyle = '#4a3728'; // Ellen: brown hair
     ctx.beginPath();
     ctx.moveTo(-14, -58 + bounce * 0.5);
     ctx.quadraticCurveTo(-18, -45, -12, -32 + bounce * 0.5);
@@ -189,7 +273,7 @@ const Assets = {
     ctx.fill();
 
     // --- HAIR: Front/top hair bangs (drawn on top of skin, but framed so it doesn't block the eyes) ---
-    ctx.fillStyle = '#2b1d1d';
+    ctx.fillStyle = '#4a3728'; // Ellen: brown hair
     ctx.beginPath();
     ctx.arc(0, -60 + bounce * 0.5, 14, Math.PI, 0); // top dome
     ctx.lineTo(14, -48 + bounce * 0.5); // right side lock
@@ -330,8 +414,8 @@ const Assets = {
       ctx.arc(0, -44, 11, 0, Math.PI * 2);
       ctx.fill();
 
-      // Hair (short brown hair)
-      ctx.fillStyle = '#4a3728';
+      // Hair (Barney: black hair)
+      ctx.fillStyle = '#1a1a1a';
       ctx.beginPath();
       ctx.arc(0, -46, 12, Math.PI, 0);
       ctx.fill();
@@ -372,7 +456,18 @@ const Assets = {
     ctx.restore();
 
     // --- BODY & SUIT/CLOTHES ---
-    if (outfit === 'tuxedo') {
+    if (outfit === 'graduation') {
+      ctx.fillStyle = '#1e1e24'; // Black gown
+      ctx.fillRect(-16, -48 + bounce * 0.3, 32, 38);
+      // V-neck stripe (academic hood colors - gold)
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-6, -48 + bounce * 0.3);
+      ctx.lineTo(0, -35 + bounce * 0.3);
+      ctx.lineTo(6, -48 + bounce * 0.3);
+      ctx.stroke();
+    } else if (outfit === 'tuxedo') {
       ctx.fillStyle = '#111115'; // Black jacket
       ctx.fillRect(-14, -48 + bounce * 0.3, 28, 33);
       // White shirt triangle
@@ -399,6 +494,63 @@ const Assets = {
       // Khaki pants
       ctx.fillStyle = '#e9c46a';
       ctx.fillRect(-13, -27 + bounce * 0.3, 26, 12);
+    } else if (outfit === 'red_vneck') {
+      // Red V-neck t-shirt
+      ctx.fillStyle = '#d62828';
+      ctx.fillRect(-13, -48 + bounce * 0.3, 26, 21);
+      // V-neck cut
+      ctx.fillStyle = '#ffd1ac'; // skin showing through
+      ctx.beginPath();
+      ctx.moveTo(-4, -48 + bounce * 0.3);
+      ctx.lineTo(4, -48 + bounce * 0.3);
+      ctx.lineTo(0, -40 + bounce * 0.3);
+      ctx.closePath();
+      ctx.fill();
+      // Dark jeans
+      ctx.fillStyle = '#1d3557';
+      ctx.fillRect(-13, -27 + bounce * 0.3, 26, 12);
+    } else if (outfit === 'flannel') {
+      // Flannel shirt (plaid pattern) — cozy first-home vibe
+      ctx.fillStyle = '#8b2500';
+      ctx.fillRect(-13, -48 + bounce * 0.3, 26, 21);
+      // Plaid stripes
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      for (let sx = -13; sx <= 13; sx += 6) {
+        ctx.fillRect(sx, -48 + bounce * 0.3, 2, 21);
+      }
+      ctx.fillStyle = 'rgba(255,200,100,0.12)';
+      for (let sy = -48; sy <= -27; sy += 5) {
+        ctx.fillRect(-13, sy + bounce * 0.3, 26, 1.5);
+      }
+      // Khaki pants
+      ctx.fillStyle = '#b5a67d';
+      ctx.fillRect(-13, -27 + bounce * 0.3, 26, 12);
+    } else if (outfit === 'suit') {
+      // Smart navy suit for the engagement
+      ctx.fillStyle = '#1d3557';
+      ctx.fillRect(-14, -48 + bounce * 0.3, 28, 33);
+      // White shirt + tie
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-3, -48 + bounce * 0.3, 6, 20);
+      ctx.fillStyle = '#e63946'; // red tie
+      ctx.fillRect(-1.5, -46 + bounce * 0.3, 3, 16);
+      // Tie knot
+      ctx.beginPath();
+      ctx.moveTo(-3, -46 + bounce * 0.3);
+      ctx.lineTo(3, -46 + bounce * 0.3);
+      ctx.lineTo(0, -43 + bounce * 0.3);
+      ctx.closePath();
+      ctx.fill();
+    } else if (outfit === 'dad_casual') {
+      // Relaxed polo shirt
+      ctx.fillStyle = '#588157'; // olive green polo
+      ctx.fillRect(-13, -48 + bounce * 0.3, 26, 21);
+      // Polo collar
+      ctx.fillStyle = '#3a5a40';
+      ctx.fillRect(-6, -48 + bounce * 0.3, 12, 3);
+      // Comfortable chinos
+      ctx.fillStyle = '#dda15e';
+      ctx.fillRect(-13, -27 + bounce * 0.3, 26, 12);
     } else if (outfit === 'hiking') {
       // Red vest / shirt
       ctx.fillStyle = '#e63946';
@@ -414,7 +566,13 @@ const Assets = {
     ctx.save();
     ctx.translate(-11, -44 + bounce * 0.3);
     ctx.rotate(-walkCycle * 0.3);
-    ctx.fillStyle = outfit === 'tuxedo' ? '#111115' : '#457b9d';
+    ctx.fillStyle = outfit === 'graduation' ? '#1e1e24' :
+                   (outfit === 'tuxedo' ? '#111115' :
+                   (outfit === 'suit' ? '#1d3557' :
+                   (outfit === 'red_vneck' ? '#d62828' :
+                   (outfit === 'flannel' ? '#8b2500' :
+                   (outfit === 'dad_casual' ? '#588157' :
+                   (outfit === 'hiking' ? '#e63946' : '#457b9d'))))));
     ctx.fillRect(-3, 0, 6, 19);
     ctx.fillStyle = '#ffd1ac';
     ctx.beginPath();
@@ -426,7 +584,13 @@ const Assets = {
     ctx.save();
     ctx.translate(11, -44 + bounce * 0.3);
     ctx.rotate(walkCycle * 0.3);
-    ctx.fillStyle = outfit === 'tuxedo' ? '#111115' : '#457b9d';
+    ctx.fillStyle = outfit === 'graduation' ? '#1e1e24' :
+                   (outfit === 'tuxedo' ? '#111115' :
+                   (outfit === 'suit' ? '#1d3557' :
+                   (outfit === 'red_vneck' ? '#d62828' :
+                   (outfit === 'flannel' ? '#8b2500' :
+                   (outfit === 'dad_casual' ? '#588157' :
+                   (outfit === 'hiking' ? '#e63946' : '#457b9d'))))));
     ctx.fillRect(-3, 0, 6, 19);
     ctx.fillStyle = '#ffd1ac';
     ctx.beginPath();
@@ -455,12 +619,39 @@ const Assets = {
     ctx.stroke();
 
     // --- HAIR ---
-    ctx.fillStyle = '#4a3728'; // Brown hair
+    ctx.fillStyle = '#1a1a1a'; // Barney: black hair
     ctx.beginPath();
     ctx.arc(0, -63 + bounce * 0.5, 13.5, Math.PI, 0);
     ctx.fill();
     // Sideburns / top sweep
     ctx.fillRect(-13, -63 + bounce * 0.5, 6, 8);
+
+    // --- ACCESSORIES ---
+    if (outfit === 'graduation') {
+      // Cap
+      ctx.fillStyle = '#1e1e24';
+      ctx.beginPath();
+      ctx.moveTo(-18, -74 + bounce * 0.5);
+      ctx.lineTo(0, -82 + bounce * 0.5);
+      ctx.lineTo(18, -74 + bounce * 0.5);
+      ctx.lineTo(0, -66 + bounce * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Cap Base
+      ctx.fillRect(-8, -69 + bounce * 0.5, 16, 5);
+
+      // Yellow Tassel
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -74 + bounce * 0.5);
+      ctx.lineTo(-12, -70 + bounce * 0.5);
+      ctx.lineTo(-12, -60 + bounce * 0.5);
+      ctx.stroke();
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(-14, -60 + bounce * 0.5, 4, 4);
+    }
 
     ctx.restore();
   },
@@ -842,6 +1033,70 @@ const Assets = {
   },
 
   // Draw Heart (Collectible Item)
+  // Draw floating balloons cluster for engagement level
+  drawBalloons(ctx, baseX, baseY, time) {
+    const balloonDefs = [
+      // [offsetX, offsetY, color, phase] — spread around the gazebo
+      [-90, -130, '#e63946', 0.0],   // red left far
+      [-65, -160, '#ff6b8a', 0.7],   // pink left
+      [-40, -145, '#f4a261', 1.4],   // orange left-center
+      [-20, -175, '#e76f51', 2.1],   // coral left-of-center
+      [  0, -185, '#ff477e', 2.8],   // hot-pink center
+      [ 20, -170, '#d62828', 3.5],   // deep-red center-right
+      [ 40, -150, '#fcbf49', 0.3],   // gold right-center
+      [ 65, -165, '#ff9a9e', 1.0],   // salmon right
+      [ 90, -135, '#e63946', 1.7],   // red right far
+      [-50, -190, '#ff85a1', 2.4],   // rose high-left
+      [ 50, -195, '#f28482', 3.1],   // blush high-right
+      [  0, -210, '#d62828', 0.5],   // deep-red top-center
+    ];
+
+    ctx.save();
+    ctx.translate(baseX, baseY);
+
+    balloonDefs.forEach(([ox, oy, color, phase]) => {
+      const bob = Math.sin(time * 0.002 + phase) * 6;
+      const sway = Math.sin(time * 0.0015 + phase * 1.3) * 4;
+      const bx = ox + sway;
+      const by = oy + bob;
+
+      // String
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(bx, by + 14);
+      ctx.quadraticCurveTo(bx + sway * 0.5, by + 35, bx - sway * 0.3, by + 50);
+      ctx.stroke();
+
+      // Balloon body (oval)
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.scale(1, 1.25);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Highlight/shine
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(bx - 3, by - 4, 3, 2, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Knot at bottom
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(bx - 2, by + 12);
+      ctx.lineTo(bx + 2, by + 12);
+      ctx.lineTo(bx, by + 16);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    ctx.restore();
+  },
+
   drawHeart(ctx, x, y, frame) {
     ctx.save();
     ctx.translate(x, y + Math.sin(frame * 0.1) * 3);
@@ -1101,21 +1356,50 @@ const Assets = {
       return;
     }
 
+    // Engagement level: draw animated balloons outside the cache
+    if (levelId === 3) {
+      const key3 = `scenery_3`;
+      const cachedGazebo = this.getCached(
+        key3,
+        (offscreenCtx) => {
+          this._drawSceneryDirect(offscreenCtx, 3, 0, 0);
+        },
+        400,
+        460,
+        200,
+        0
+      );
+      ctx.save();
+      ctx.translate(stageX, 420);
+      ctx.drawImage(cachedGazebo, -200, -420);
+      ctx.restore();
+
+      // Animated balloons (not cached so they bob/sway)
+      ctx.save();
+      ctx.translate(0, 420);
+      this.drawBalloons(ctx, stageX, 0, time);
+      ctx.restore();
+      return;
+    }
+
     const key = `scenery_${levelId}`;
+    // _drawSceneryDirect anchors itself to ground level (translate y=420), so the
+    // offscreen cache must be tall enough to contain that and use anchorY=0 — a
+    // non-zero anchorY here double-translates the scenery off-canvas (blank landmark).
     const cachedScenery = this.getCached(
       key,
       (offscreenCtx) => {
         this._drawSceneryDirect(offscreenCtx, levelId, 0, 0);
       },
       400,
-      280,
+      460,
       200,
-      250
+      0
     );
 
     ctx.save();
     ctx.translate(stageX, 420);
-    ctx.drawImage(cachedScenery, -200, -250);
+    ctx.drawImage(cachedScenery, -200, -420);
     ctx.restore();
   },
 
@@ -1349,8 +1633,8 @@ const Assets = {
 
     if (type === 'first') {
       // First Home (small, cozy)
-      // Body (brick red)
-      ctx.fillStyle = '#d66853';
+      // Body (blue — matches the real first home photo)
+      ctx.fillStyle = '#5b8fb3';
       ctx.fillRect(-50, -60, 100, 60);
 
       // Roof (dark blue-grey tiles)
@@ -1388,11 +1672,11 @@ const Assets = {
       ctx.strokeRect(18, -45, 18, 18);
     } else {
       // Second Home (larger suburban with nice details)
-      // Body (Light cream/grey)
-      ctx.fillStyle = '#f4f1de';
+      // Body (warm red — matches the real second home photo)
+      ctx.fillStyle = '#c15b42';
       ctx.fillRect(-70, -75, 140, 75);
-      // Garage extension
-      ctx.fillStyle = '#e07a5f';
+      // Garage extension (deeper red)
+      ctx.fillStyle = '#a84a35';
       ctx.fillRect(30, -50, 50, 50);
 
       // Main Roof
@@ -1954,6 +2238,10 @@ const Assets = {
   drawPolaroid(ctx, x, y, level, alpha, time) {
     if (alpha <= 0.01) return;
 
+    // Cycle through multiple photos for a memory (e.g. camping) every ~2.6s.
+    const imgs = level.imgElements || [];
+    const curIdx = imgs.length > 1 ? Math.floor(time / 2600) % imgs.length : 0;
+
     if (this.checkOptimize()) {
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -1962,7 +2250,7 @@ const Assets = {
       const rotateAngle = Math.sin(time * 0.0012 + level.id) * 0.04 - 0.02;
       ctx.translate(0, floatY);
       ctx.rotate(rotateAngle);
-      this._drawPolaroidDirect(ctx, 0, 0, level, 1, 0);
+      this._drawPolaroidDirect(ctx, 0, 0, level, 1, 0, curIdx);
       ctx.restore();
       return;
     }
@@ -1977,13 +2265,15 @@ const Assets = {
     ctx.translate(0, floatY);
     ctx.rotate(rotateAngle);
 
-    const hasImage = !!(level.imgElement && level.imgElement.complete && level.imgElement.naturalWidth > 0);
-    const key = `polaroid_${level.id}_${hasImage}`;
+    const img = imgs[curIdx];
+    const hasImage = !!(img && img.complete && img.naturalWidth > 0);
+    // Include the photo index so each cycled photo gets its own cached frame.
+    const key = `polaroid_${level.id}_${curIdx}_${hasImage}`;
 
     const cachedCanvas = this.getCached(
       key,
       (offscreenCtx) => {
-        this._drawPolaroidDirect(offscreenCtx, 0, 0, level, 1, 0);
+        this._drawPolaroidDirect(offscreenCtx, 0, 0, level, 1, 0, curIdx);
       },
       160,
       185,
@@ -1995,7 +2285,18 @@ const Assets = {
     ctx.restore();
   },
 
-  _drawPolaroidDirect(ctx, x, y, level, alpha, time) {
+  // Draw an image scaled to COVER the target rect (center-crop, no stretching).
+  _drawImageCover(ctx, img, dx, dy, dw, dh) {
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    if (!iw || !ih) return;
+    const ir = iw / ih, dr = dw / dh;
+    let sx, sy, sw, sh;
+    if (ir > dr) { sh = ih; sw = ih * dr; sx = (iw - sw) / 2; sy = 0; }
+    else { sw = iw; sh = iw / dr; sx = 0; sy = (ih - sh) / 2; }
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  },
+
+  _drawPolaroidDirect(ctx, x, y, level, alpha, time, imgIdx = 0) {
     if (alpha <= 0.01) return;
 
     ctx.save();
@@ -2026,10 +2327,11 @@ const Assets = {
     const px = -photoW / 2;
     const py = -cardH / 2 + 8; // top margin 8px
 
-    // Check if the user has loaded a valid image
-    if (level.imgElement && level.imgElement.complete && level.imgElement.naturalWidth > 0) {
-      // Draw actual photo!
-      ctx.drawImage(level.imgElement, px, py, photoW, photoH);
+    // Check if the user has loaded a valid image (the current one in the cycle)
+    const img = (level.imgElements || [])[imgIdx] || (level.imgElements || [])[0];
+    if (img && img.complete && img.naturalWidth > 0) {
+      // Draw actual photo, center-cropped to fill the frame (no stretching)
+      this._drawImageCover(ctx, img, px, py, photoW, photoH);
     } else {
       // Draw procedural sketch placeholder! 🎨
       // Soft pastel colored background for the photo frame
@@ -2290,6 +2592,418 @@ const Assets = {
 
       default:
         break;
+    }
+    ctx.restore();
+  },
+
+  // ============================================================
+  // COMBAT SPRITES (sword/gun pickups, enemies, trampoline, FX)
+  // ============================================================
+
+  // Floating pickup. kind: 'racket' | 'balls'
+  drawWeaponPickup(ctx, x, y, kind, frame) {
+    ctx.save();
+    const bob = Math.sin(frame * 0.08) * 4;
+    ctx.translate(x, y + bob);
+
+    // Glow halo
+    const glow = ctx.createRadialGradient(0, -12, 2, 0, -12, 28);
+    glow.addColorStop(0, 'rgba(214, 246, 90, 0.55)');
+    glow.addColorStop(1, 'rgba(214, 246, 90, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, -12, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (kind === 'racket') {
+      ctx.save();
+      ctx.rotate(-0.35);
+      // Handle
+      ctx.fillStyle = '#6d4c2f';
+      ctx.fillRect(-2.5, -6, 5, 22);
+      ctx.fillStyle = '#5a3d25';
+      ctx.fillRect(-2.5, 12, 5, 4); // butt cap
+      // Head (oval frame)
+      ctx.strokeStyle = '#e63946';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(0, -20, 11, 15, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Throat
+      ctx.fillStyle = '#e63946';
+      ctx.beginPath();
+      ctx.moveTo(-4, -8); ctx.lineTo(4, -8); ctx.lineTo(2.5, -4); ctx.lineTo(-2.5, -4); ctx.closePath();
+      ctx.fill();
+      // Strings
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 0.8;
+      for (let i = -8; i <= 8; i += 4) {
+        ctx.beginPath(); ctx.moveTo(i, -32); ctx.lineTo(i, -8); ctx.stroke();
+      }
+      for (let j = -33; j <= -8; j += 4) {
+        ctx.beginPath(); ctx.moveTo(-10, j); ctx.lineTo(10, j); ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      // A few tennis balls
+      const ball = (bx, by) => {
+        ctx.fillStyle = '#d6f65a';
+        ctx.beginPath();
+        ctx.arc(bx, by, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(bx - 4, by - 4, 8, 0.2, 1.4);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(bx + 4, by + 4, 8, Math.PI + 0.2, Math.PI + 1.4);
+        ctx.stroke();
+      };
+      ball(-6, -10);
+      ball(7, -14);
+      ball(1, -2);
+    }
+    ctx.restore();
+  },
+
+  // Bounce pad. y = top surface. squash 0..1 compresses the band.
+  drawTrampoline(ctx, x, y, w, squash) {
+    ctx.save();
+    ctx.translate(x, y);
+    const half = w / 2;
+    const dip = squash * 9;
+
+    // Legs
+    ctx.strokeStyle = '#3a3f55';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-half + 6, 0); ctx.lineTo(-half + 2, 22);
+    ctx.moveTo(half - 6, 0); ctx.lineTo(half - 2, 22);
+    ctx.stroke();
+
+    // Frame ring
+    ctx.fillStyle = '#e63946';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, half, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bouncy mat (dips when squashed)
+    ctx.fillStyle = '#222633';
+    ctx.beginPath();
+    ctx.ellipse(0, dip, half - 6, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Spring highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, dip - 1, half - 9, 4, 0, Math.PI, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  },
+
+  // Cute monster enemies. kind: 'slime_green'|'slime_purple'|'slime_teal' (ground)
+  // and 'cloud'|'bat' (flying). y = vertical CENTER. hitFlash > 0 tints white on hit.
+  // tier 2 = tougher 2-hit monster: drawn bigger, with hp pips above it.
+  drawEnemy(ctx, x, y, kind, frame, dir, hitFlash, tier, hp, maxHp) {
+    ctx.save();
+    ctx.translate(x, y);
+    // Tougher monsters are physically bigger so they read as stronger
+    if (tier >= 2) ctx.scale(1.4, 1.4);
+    if (dir < 0) ctx.scale(-1, 1);
+    const wob = Math.sin(frame * 0.18) * 2;
+
+    const flash = hitFlash > 0;
+
+    if (kind && kind.indexOf('slime') === 0) {
+      // Wobbly grumpy jelly blob
+      const slimeColors = {
+        slime_green:  { body: '#5fbf57', dark: '#3f9a3a' },
+        slime_purple: { body: '#a85cd0', dark: '#7e3fa6' },
+        slime_teal:   { body: '#1fb6a6', dark: '#138a7e' }
+      };
+      const c = slimeColors[kind] || slimeColors.slime_green;
+      // squash/stretch wobble
+      const sq = flash ? 0 : Math.sin(frame * 0.16) * 0.12;
+      const w = 17 * (1 + sq);
+      const h = 16 * (1 - sq);
+      // body: rounded dome with a flat, slightly dripping bottom
+      ctx.fillStyle = flash ? '#fff' : c.body;
+      ctx.beginPath();
+      ctx.moveTo(-w, 13);
+      ctx.quadraticCurveTo(-w, -h, 0, -h);
+      ctx.quadraticCurveTo(w, -h, w, 13);
+      // wavy bottom drips
+      ctx.quadraticCurveTo(w * 0.6, 17, w * 0.35, 13);
+      ctx.quadraticCurveTo(0, 18, -w * 0.35, 13);
+      ctx.quadraticCurveTo(-w * 0.6, 17, -w, 13);
+      ctx.closePath();
+      ctx.fill();
+      if (!flash) {
+        // darker base shadow
+        ctx.fillStyle = c.dark;
+        ctx.beginPath();
+        ctx.ellipse(0, 12, w * 0.7, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // glossy highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.30)';
+        ctx.beginPath();
+        ctx.ellipse(-6, -4, 4, 6, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+        // eyes
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(-5, -2, 4.2, 0, Math.PI * 2);
+        ctx.arc(5, -2, 4.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.arc(-4, -1, 1.9, 0, Math.PI * 2);
+        ctx.arc(6, -1, 1.9, 0, Math.PI * 2);
+        ctx.fill();
+        // grumpy brows
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-9, -7); ctx.lineTo(-2, -5);
+        ctx.moveTo(9, -7); ctx.lineTo(2, -5);
+        ctx.stroke();
+        // little frown
+        ctx.beginPath();
+        ctx.arc(0, 9, 3.2, Math.PI * 1.15, Math.PI * 1.85);
+        ctx.stroke();
+      }
+    } else if (kind === 'bat') {
+      // Little flappy bat
+      ctx.translate(0, wob);
+      const flap = Math.sin(frame * 0.4) * 7;
+      const body = flash ? '#fff' : '#5b4a73';
+      // wings
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.moveTo(-6, 0);
+      ctx.quadraticCurveTo(-16, -flap, -23, 3);
+      ctx.quadraticCurveTo(-15, 3, -13, 8);
+      ctx.quadraticCurveTo(-11, 3, -6, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(6, 0);
+      ctx.quadraticCurveTo(16, -flap, 23, 3);
+      ctx.quadraticCurveTo(15, 3, 13, 8);
+      ctx.quadraticCurveTo(11, 3, 6, 5);
+      ctx.closePath();
+      ctx.fill();
+      // body
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.fill();
+      // ears
+      ctx.beginPath();
+      ctx.moveTo(-5, -6); ctx.lineTo(-7, -13); ctx.lineTo(-1, -7); ctx.closePath();
+      ctx.moveTo(5, -6); ctx.lineTo(7, -13); ctx.lineTo(1, -7); ctx.closePath();
+      ctx.fill();
+      if (!flash) {
+        // eyes
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(-3, -1, 2.6, 0, Math.PI * 2);
+        ctx.arc(3, -1, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.arc(-3, -1, 1.2, 0, Math.PI * 2);
+        ctx.arc(3, -1, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        // fangs
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(-2, 5); ctx.lineTo(-0.5, 8); ctx.lineTo(0.5, 5); ctx.closePath();
+        ctx.moveTo(2, 5); ctx.lineTo(0.5, 8); ctx.lineTo(-0.5, 5); ctx.closePath();
+        ctx.fill();
+      }
+    } else if (kind === 'cloud') {
+      // Grumpy rain cloud (flying)
+      ctx.translate(0, wob);
+      ctx.fillStyle = flash ? '#fff' : '#6c7a89';
+      ctx.beginPath();
+      ctx.arc(-10, 0, 10, 0, Math.PI * 2);
+      ctx.arc(2, -4, 13, 0, Math.PI * 2);
+      ctx.arc(14, 2, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-10, 0, 24, 9);
+      if (!flash) {
+        // rain
+        ctx.strokeStyle = '#4ea8de';
+        ctx.lineWidth = 2;
+        for (let i = -1; i <= 1; i++) {
+          const ry = 12 + ((frame * 0.6 + i * 6) % 10);
+          ctx.beginPath();
+          ctx.moveTo(i * 8, 9 + ry - 12); ctx.lineTo(i * 8, ry);
+          ctx.stroke();
+        }
+        // grumpy eyes
+        ctx.fillStyle = '#1c2530';
+        ctx.beginPath();
+        ctx.arc(-2, -4, 2, 0, Math.PI * 2);
+        ctx.arc(8, -3, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#1c2530';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-6, -8); ctx.lineTo(0, -6);
+        ctx.moveTo(12, -7); ctx.lineTo(5, -6);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // HP pips above tougher (2-hit) monsters so it's clear they take 2 hits
+    if (maxHp > 1) {
+      const topY = y - (tier >= 2 ? 34 : 24);
+      const gap = 8;
+      const startX = x - ((maxHp - 1) * gap) / 2;
+      for (let i = 0; i < maxHp; i++) {
+        ctx.beginPath();
+        ctx.arc(startX + i * gap, topY, 2.6, 0, Math.PI * 2);
+        ctx.fillStyle = i < hp ? '#ff4d6d' : 'rgba(0,0,0,0.3)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+  },
+
+  // Quick "poof" defeat puff
+  drawPoof(ctx, x, y, progress) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalAlpha = 1 - progress;
+    const r = 6 + progress * 18;
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 5 - progress * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  // Sword slash arc. progress 0..1 sweeps the blade.
+  drawSlash(ctx, x, y, dir, progress) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    ctx.globalAlpha = 1 - progress * 0.6;
+    const sweep = -0.9 + progress * 1.8; // rotate top->down
+    ctx.rotate(sweep);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, 0, 46, -0.5, 0.5);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(180,225,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 52, -0.45, 0.45);
+    ctx.stroke();
+    ctx.restore();
+  },
+
+  // Served tennis ball (player projectile). spin rotates the seam.
+  drawBullet(ctx, x, y, dir, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    // motion trail
+    ctx.fillStyle = 'rgba(214,246,90,0.30)';
+    ctx.beginPath();
+    ctx.ellipse(-dir * 9, 0, 9, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // ball
+    ctx.rotate(spin || 0);
+    ctx.fillStyle = '#d6f65a';
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    // seam curves
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(-3.5, -3.5, 7, 0.2, 1.5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(3.5, 3.5, 7, Math.PI + 0.2, Math.PI + 1.5);
+    ctx.stroke();
+    ctx.restore();
+  },
+
+  // Tennis racket drawn in Ellen's hand. anchor (x,y) = her feet position.
+  // swing 0..1 animates an overhead swing.
+  drawHeldWeapon(ctx, x, y, kind, dir, swing) {
+    if (!kind) return;
+    ctx.save();
+    ctx.translate(x + dir * 12, y - 30);
+    ctx.scale(dir, 1);
+
+    // Swing arcs the racket from cocked-back to follow-through
+    const ang = swing > 0 ? (-1.0 + swing * 2.0) : -0.35;
+    ctx.rotate(ang);
+    // Handle
+    ctx.fillStyle = '#6d4c2f';
+    ctx.fillRect(-2, -3, 4, 12);
+    // Head (oval frame)
+    ctx.strokeStyle = '#e63946';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, -16, 8, 11, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    // Strings
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 0.7;
+    for (let i = -6; i <= 6; i += 3) {
+      ctx.beginPath(); ctx.moveTo(i, -25); ctx.lineTo(i, -7); ctx.stroke();
+    }
+    for (let j = -25; j <= -7; j += 3) {
+      ctx.beginPath(); ctx.moveTo(-7, j); ctx.lineTo(7, j); ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  // Projectile fired BY an enemy at Ellen. kind tints it to match the foe.
+  drawEnemyBullet(ctx, x, y, kind, frame) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (kind === 'cloud') {
+      // Rain droplet
+      ctx.fillStyle = '#4ea8de';
+      ctx.beginPath();
+      ctx.moveTo(0, -7);
+      ctx.bezierCurveTo(5, -1, 5, 6, 0, 6);
+      ctx.bezierCurveTo(-5, 6, -5, -1, 0, -7);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(-1.5, 1, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Bat "screech" orb — dark purple energy
+      const r = 5.5 + Math.sin((frame || 0) * 0.4) * 1;
+      ctx.fillStyle = 'rgba(91,74,115,0.35)';
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5b4a73';
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#c9a8e0';
+      ctx.beginPath();
+      ctx.arc(-1.3, -1.3, 1.6, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }

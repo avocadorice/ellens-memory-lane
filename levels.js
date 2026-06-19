@@ -9,8 +9,8 @@ const levelsData = [
     id: 11,
     name: "Started Dating",
     year: "May 2012",
-    x: 800,
-    photo: "photos/0_dating.jpg",
+    x: 2000,
+    photos: ["photos/barney_ellen_dating.jpg", "photos/IMG_0951.JPG"],
     skyGradient: {
       top: "#ffecd2",
       bottom: "#fcb69f"
@@ -31,8 +31,8 @@ const levelsData = [
     id: 1,
     name: "Graduation",
     year: "June 2012",
-    x: 2000,
-    photo: "photos/1_graduation.jpg",
+    x: 3200,
+    photos: ["photos/graduation.JPG"],
     skyGradient: {
       top: "#a1c4fd",
       bottom: "#c2e9fb"
@@ -53,8 +53,8 @@ const levelsData = [
     id: 2,
     name: "Adopting Mochi",
     year: "July 2012",
-    x: 3200,
-    photo: "photos/2_mochi.jpg",
+    x: 4400,
+    photos: ["photos/mochi.JPG", "photos/IMG_2507.jpg"],
     skyGradient: {
       top: "#89f7fe",
       bottom: "#66a6ff"
@@ -75,8 +75,8 @@ const levelsData = [
     id: 5,
     name: "Our First Home",
     year: "December 2016",
-    x: 4400,
-    photo: "photos/5_first_home.jpg",
+    x: 5600,
+    photos: ["photos/first_home.jpg"],
     skyGradient: {
       top: "#fbc2eb",
       bottom: "#a6c1ee"
@@ -97,8 +97,8 @@ const levelsData = [
     id: 3,
     name: "The Engagement",
     year: "March 2018",
-    x: 5600,
-    photo: "photos/3_engagement.jpg",
+    x: 6800,
+    photos: ["photos/proposal.jpg", "photos/DSC_6346.jpg", "photos/IMG_2110.JPG"],
     skyGradient: {
       top: "#fddb92",
       bottom: "#d1fdff"
@@ -119,8 +119,8 @@ const levelsData = [
     id: 4,
     name: "Our Wedding Day",
     year: "October 2018",
-    x: 6800,
-    photo: "photos/4_wedding.jpg",
+    x: 8000,
+    photos: ["photos/wedding.JPG", "photos/IMG_4496.JPG", "photos/IMG_4500.JPG", "photos/IMG_1633.JPG"],
     skyGradient: {
       top: "#ff9a9e",
       bottom: "#fecfef"
@@ -141,8 +141,8 @@ const levelsData = [
     id: 6,
     name: "Welcoming Preston",
     year: "July 2019",
-    x: 8000,
-    photo: "photos/6_preston.jpg",
+    x: 9200,
+    photos: ["photos/ellen_preston.JPG", "photos/AG3_2242.jpg", "photos/IMG_3673.jpg", "photos/IMG_7003.jpg", "photos/IMG_7147.jpg"],
     skyGradient: {
       top: "#b1f2ff",
       bottom: "#a1c4fd"
@@ -163,8 +163,8 @@ const levelsData = [
     id: 7,
     name: "Moving to Our Second House",
     year: "October 2020",
-    x: 9200,
-    photo: "photos/7_second_home.jpg",
+    x: 10400,
+    photos: ["photos/2nd_home.webp"],
     skyGradient: {
       top: "#30cfd0",
       bottom: "#330867"
@@ -185,8 +185,20 @@ const levelsData = [
     id: 8,
     name: "Welcoming Blaire",
     year: "August 2024",
-    x: 10400,
-    photo: "photos/8_blaire.jpg",
+    x: 11600,
+    photos: [
+      "photos/ellen_blaire.jpg",
+      "photos/D41E430D-92A3-4FAA-91FB-F022EE2C4E7D.JPG",
+      "photos/IMG_0123.jpg",
+      "photos/IMG_6587.JPG",
+      "photos/IMG_6591.JPG",
+      "photos/IMG_6641.JPG",
+      "photos/IMG_7497.jpg",
+      "photos/IMG_9666.jpg",
+      "photos/IMG_5171.jpg",
+      "photos/IMG_5033.jpg",
+      "photos/IMG_9942.jpg"
+    ],
     skyGradient: {
       top: "#1a1c4b",
       bottom: "#0f1026"
@@ -207,8 +219,16 @@ const levelsData = [
     id: 9,
     name: "RV Camping Adventures",
     year: "2025",
-    x: 11600,
-    photo: "photos/9_camping.jpg",
+    x: 12800,
+    photos: [
+      "photos/airstream_camping.jpg",
+      "photos/bean_trailer_camping.jpg",
+      "photos/preston_blaire_camping.jpg",
+      "photos/IMG_9054.jpg",
+      "photos/IMG_4900.jpg",
+      "photos/IMG_5006.jpg",
+      "photos/IMG_5023.jpg"
+    ],
     skyGradient: {
       top: "#0f172a",
       bottom: "#311b5e"
@@ -229,8 +249,8 @@ const levelsData = [
     id: 10,
     name: "The Family at Mt. Fuji",
     year: "2026",
-    x: 12800,
-    photo: "photos/10_fuji.jpg",
+    x: 14000,
+    photos: ["photos/mt_fuji.jpg", "photos/IMG_2680.JPG", "photos/IMG_2817.jpg"],
     skyGradient: {
       top: "#ff7e5f",
       bottom: "#feb47b"
@@ -239,7 +259,7 @@ const levelsData = [
     dialogue: [
       "The Ultimate Journey! 🗻🌸",
       "Look! Mt. Fuji standing beautiful against the sunrise.",
-      "The four of us, Preston, Blaire, Mochi, and us, standing together in Japan.",
+      "The five of us, Preston, Blaire, Mochi, and us, standing together in Japan.",
       "Happy Birthday, Ellen! Here's to making many more memories, together."
     ],
     quiz: {
