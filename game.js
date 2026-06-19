@@ -710,6 +710,7 @@ const Game = {
 
     // Pickups: tennis racket, tennis balls, and family locket
     const locketX = this.bossArenaStart - 240;
+    this.locketX = locketX;
     this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
     this.pickups.push({ x: ballsX, y: groundY, kind: 'balls', collected: false, frame: 0 });
     this.pickups.push({ x: locketX, y: groundY, kind: 'locket', collected: false, frame: 0 });
@@ -875,7 +876,12 @@ const Game = {
     }
     if (this.ballsX && this.player.x >= this.ballsX) {
       this.player.hasBalls = true;
-      this.pickups.forEach(p => { p.collected = true; });
+      this.pickups.forEach(p => { if (p.kind === 'balls') p.collected = true; });
+    }
+    // Family locket (all 5 join the attack) — grant + consume only past its spot
+    if (this.locketX && this.player.x >= this.locketX) {
+      this.player.familyAttackActive = true;
+      this.pickups.forEach(p => { if (p.kind === 'locket') p.collected = true; });
     }
 
     // Chime BGM effect
