@@ -625,10 +625,10 @@ const Game = {
     this.player.isDead = false;
 
     // Setup hearts & hurdles along the entire track
-    const trackEnd = this.levels[this.levels.length - 1].x + 400;
+    const walkLimitX = this.levels[this.levels.length - 1].x;
 
-    // Distribute collectibles and obstacles
-    for (let x = 300; x < trackEnd - 200; x += 220) {
+    // Distribute collectibles and obstacles (stop before the final Mt. Fuji milestone so no hearts spawn in the locked zone)
+    for (let x = 300; x < walkLimitX - 150; x += 220) {
       // Don't spawn collectibles too close to level dialogue trigger zones (milestone.x +/- 120)
       let nearMilestone = false;
       this.levels.forEach(lvl => {
