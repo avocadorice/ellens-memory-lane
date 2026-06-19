@@ -2600,70 +2600,274 @@ const Assets = {
   // COMBAT SPRITES (sword/gun pickups, enemies, trampoline, FX)
   // ============================================================
 
-  // Floating pickup. kind: 'racket' | 'balls'
+  // Floating pickup. kind: 'racket' | 'balls' | 'locket'
   drawWeaponPickup(ctx, x, y, kind, frame) {
     ctx.save();
     const bob = Math.sin(frame * 0.08) * 4;
     ctx.translate(x, y + bob);
 
-    // Glow halo
-    const glow = ctx.createRadialGradient(0, -12, 2, 0, -12, 28);
-    glow.addColorStop(0, 'rgba(214, 246, 90, 0.55)');
-    glow.addColorStop(1, 'rgba(214, 246, 90, 0)');
-    ctx.fillStyle = glow;
+    if (kind === 'locket') {
+      // Glow halo in pink/rose
+      const glow = ctx.createRadialGradient(0, -12, 2, 0, -12, 32);
+      glow.addColorStop(0, 'rgba(255, 77, 109, 0.65)');
+      glow.addColorStop(1, 'rgba(255, 77, 109, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, -12, 32, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Gold heart locket outline
+      ctx.fillStyle = '#ffd700'; // gold
+      ctx.strokeStyle = '#cc9900'; // dark gold
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      // Draw heart centered around (0, -15)
+      ctx.moveTo(0, -5);
+      ctx.bezierCurveTo(-10, -13, -14, -23, 0, -25);
+      ctx.bezierCurveTo(14, -23, 10, -13, 0, -5);
+      ctx.fill();
+      ctx.stroke();
+
+      // Shiny highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.beginPath();
+      ctx.ellipse(-3, -17, 4, 1.8, -Math.PI / 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Gemstone in center
+      ctx.fillStyle = '#ff4d6d'; // pinkish red
+      ctx.beginPath();
+      ctx.arc(0, -15, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Glow halo (default yellow)
+      const glow = ctx.createRadialGradient(0, -12, 2, 0, -12, 28);
+      glow.addColorStop(0, 'rgba(214, 246, 90, 0.55)');
+      glow.addColorStop(1, 'rgba(214, 246, 90, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, -12, 28, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (kind === 'racket') {
+        ctx.save();
+        ctx.rotate(-0.35);
+        // Handle
+        ctx.fillStyle = '#6d4c2f';
+        ctx.fillRect(-2.5, -6, 5, 22);
+        ctx.fillStyle = '#5a3d25';
+        ctx.fillRect(-2.5, 12, 5, 4); // butt cap
+        // Head (oval frame)
+        ctx.strokeStyle = '#e63946';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.ellipse(0, -20, 11, 15, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        // Throat
+        ctx.fillStyle = '#e63946';
+        ctx.beginPath();
+        ctx.moveTo(-4, -8); ctx.lineTo(4, -8); ctx.lineTo(2.5, -4); ctx.lineTo(-2.5, -4); ctx.closePath();
+        ctx.fill();
+        // Strings
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+        ctx.lineWidth = 0.8;
+        for (let i = -8; i <= 8; i += 4) {
+          ctx.beginPath(); ctx.moveTo(i, -32); ctx.lineTo(i, -8); ctx.stroke();
+        }
+        for (let j = -33; j <= -8; j += 4) {
+          ctx.beginPath(); ctx.moveTo(-10, j); ctx.lineTo(10, j); ctx.stroke();
+        }
+        ctx.restore();
+      } else {
+        // A few tennis balls
+        const ball = (bx, by) => {
+          ctx.fillStyle = '#d6f65a';
+          ctx.beginPath();
+          ctx.arc(bx, by, 7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(bx - 4, by - 4, 8, 0.2, 1.4);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(bx + 4, by + 4, 8, Math.PI + 0.2, Math.PI + 1.4);
+          ctx.stroke();
+        };
+        ball(-6, -10);
+        ball(7, -14);
+        ball(1, -2);
+      }
+    }
+    ctx.restore();
+  },
+
+  // Barney's Volleyball
+  drawVolleyball(ctx, x, y, dir, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    // motion trail
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.beginPath();
-    ctx.arc(0, -12, 28, 0, Math.PI * 2);
+    ctx.ellipse(-dir * 9, 0, 9, 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    if (kind === 'racket') {
-      ctx.save();
-      ctx.rotate(-0.35);
-      // Handle
-      ctx.fillStyle = '#6d4c2f';
-      ctx.fillRect(-2.5, -6, 5, 22);
-      ctx.fillStyle = '#5a3d25';
-      ctx.fillRect(-2.5, 12, 5, 4); // butt cap
-      // Head (oval frame)
-      ctx.strokeStyle = '#e63946';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.ellipse(0, -20, 11, 15, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      // Throat
-      ctx.fillStyle = '#e63946';
-      ctx.beginPath();
-      ctx.moveTo(-4, -8); ctx.lineTo(4, -8); ctx.lineTo(2.5, -4); ctx.lineTo(-2.5, -4); ctx.closePath();
-      ctx.fill();
-      // Strings
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-      ctx.lineWidth = 0.8;
-      for (let i = -8; i <= 8; i += 4) {
-        ctx.beginPath(); ctx.moveTo(i, -32); ctx.lineTo(i, -8); ctx.stroke();
-      }
-      for (let j = -33; j <= -8; j += 4) {
-        ctx.beginPath(); ctx.moveTo(-10, j); ctx.lineTo(10, j); ctx.stroke();
-      }
-      ctx.restore();
-    } else {
-      // A few tennis balls
-      const ball = (bx, by) => {
-        ctx.fillStyle = '#d6f65a';
-        ctx.beginPath();
-        ctx.arc(bx, by, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.arc(bx - 4, by - 4, 8, 0.2, 1.4);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(bx + 4, by + 4, 8, Math.PI + 0.2, Math.PI + 1.4);
-        ctx.stroke();
-      };
-      ball(-6, -10);
-      ball(7, -14);
-      ball(1, -2);
-    }
+    ctx.rotate(spin || 0);
+    // Ball body
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Curved panels of a volleyball (blue/yellow segments)
+    ctx.strokeStyle = '#4d94ff'; // Blue panels
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(-4, -4, 6, 0.3, 1.4);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#ffd700'; // Yellow panels
+    ctx.beginPath();
+    ctx.arc(4, 4, 6, Math.PI + 0.3, Math.PI + 1.4);
+    ctx.stroke();
+    
+    ctx.restore();
+  },
+
+  // Preston's Nunchucks
+  drawNunchucks(ctx, x, y, dir, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(spin * 1.5 || 0); // spin a bit faster for effect
+
+    // Two wooden sticks
+    ctx.fillStyle = '#8B4513'; // brown
+    ctx.strokeStyle = '#5c2d0c';
+    ctx.lineWidth = 0.8;
+    
+    // Stick 1
+    ctx.save();
+    ctx.translate(-5, 0);
+    ctx.rotate(0.4);
+    ctx.fillRect(-1.5, -6, 3, 12);
+    ctx.strokeRect(-1.5, -6, 3, 12);
+    ctx.restore();
+
+    // Stick 2
+    ctx.save();
+    ctx.translate(5, 0);
+    ctx.rotate(-0.4);
+    ctx.fillRect(-1.5, -6, 3, 12);
+    ctx.strokeRect(-1.5, -6, 3, 12);
+    ctx.restore();
+
+    // Connecting chain
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-5, -3);
+    ctx.quadraticCurveTo(0, 2, 5, -3);
+    ctx.stroke();
+
+    ctx.restore();
+  },
+
+  // Blaire's Apple
+  drawApple(ctx, x, y, dir, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(spin || 0);
+
+    // Apple body (slightly heart shaped)
+    ctx.fillStyle = '#ff3b30'; // vibrant red
+    ctx.beginPath();
+    ctx.arc(-2.5, -1, 4.5, 0, Math.PI * 2);
+    ctx.arc(2.5, -1, 4.5, 0, Math.PI * 2);
+    ctx.arc(0, 2.5, 4.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Stem
+    ctx.strokeStyle = '#6d4c2f';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, -3);
+    ctx.quadraticCurveTo(1.5, -7, 2, -8);
+    ctx.stroke();
+
+    // Leaf
+    ctx.fillStyle = '#4cd964'; // green
+    ctx.beginPath();
+    ctx.ellipse(2, -6, 2.5, 1.2, -Math.PI/6, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+  },
+
+  // Blaire's Avocado
+  drawAvocado(ctx, x, y, dir, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(spin || 0);
+
+    // Outer dark green skin
+    ctx.fillStyle = '#224d17';
+    ctx.beginPath();
+    ctx.ellipse(0, 1, 5.5, 7.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Lighter green flesh
+    ctx.fillStyle = '#a3e350';
+    ctx.beginPath();
+    ctx.ellipse(0, 1, 4.2, 6.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Brown seed in center
+    ctx.fillStyle = '#7a431d';
+    ctx.beginPath();
+    ctx.arc(0, 2, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shine on seed
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.arc(-0.8, 1.2, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  },
+
+  // Mochi's Dog Treat (bone)
+  drawDogTreat(ctx, x, y, dir, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(spin || 0);
+
+    ctx.fillStyle = '#f5ede3'; // off-white bone color
+    ctx.strokeStyle = '#d7cebf';
+    ctx.lineWidth = 0.8;
+
+    // Bone central shaft
+    ctx.fillRect(-6, -2, 12, 4);
+
+    // Left bone bumps
+    ctx.beginPath();
+    ctx.arc(-5.5, -2, 2, 0, Math.PI * 2);
+    ctx.arc(-5.5, 2, 2, 0, Math.PI * 2);
+    // Right bone bumps
+    ctx.arc(5.5, -2, 2, 0, Math.PI * 2);
+    ctx.arc(5.5, 2, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Stroke the top and bottom of central shaft for outline look
+    ctx.beginPath();
+    ctx.moveTo(-5, -2); ctx.lineTo(5, -2);
+    ctx.moveTo(-5, 2); ctx.lineTo(5, 2);
+    ctx.stroke();
+
     ctx.restore();
   },
 

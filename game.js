@@ -1,5 +1,15 @@
 // Core Game Engine for Ellen's Memory Lane
 
+// Developer mode: only ON when running locally OR when ?dev is in the URL.
+// Gates the Dev Panel, the chapter (memory) selector, the start-screen music
+// toggle, the in-game audio button, and the keyboard dev shortcuts — so the
+// shipped TV/gift build shows a clean, kiosk-style experience.
+const DEV_MODE = (
+  location.hostname === 'localhost' ||
+  location.hostname === '127.0.0.1' ||
+  new URLSearchParams(location.search).has('dev')
+);
+
 // --- WEBASSEMBLY PHYSICS MODULE ---
 let wasmInstance = null;
 let wasmExports = null;
@@ -45,7 +55,58 @@ const AudioEngine = {
   lookahead: 50.0, // ms - Polling check rate
   activeOscillators: [],
   startTime: 0.0,
-  
+  currentTrack: 'normal',
+  userMusicOn: false, // did the player opt into music? (drives boss-music swaps)
+
+  // Note frequency table shared by every track
+  NOTES: {
+    'A2': 110.00, 'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'F#3': 185.00,
+    'G3': 196.00, 'A3': 220.00, 'Bb3': 233.08, 'B3': 246.94,
+    'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'F#4': 369.99, 'G4': 392.00,
+    'A4': 440.00, 'Bb4': 466.16, 'B4': 493.88,
+    'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'F#5': 739.99, 'G5': 783.99,
+    'A5': 880.00, 'Bb5': 932.33, 'B5': 987.77, 'D6': 1174.66
+  },
+
+  // Two playable themes: the gentle nostalgic walk + the driving boss battle
+  bgmTracks: {
+    normal: {
+      tempo: 105,
+      chordWave: 'triangle', chordVol: 0.03, chordDur: 1.8,
+      melodyWave: 'sine', melodyVol: 0.05, melodyDur: 0.45,
+      chords: [
+        ['C3', 'E4', 'G4', 'B4'],
+        ['G3', 'B3', 'D4', 'F#4'],
+        ['A3', 'C4', 'E4', 'G4'],
+        ['F3', 'A3', 'C4', 'E4']
+      ],
+      melody: [
+        'E5', 'G5', 'B5', 'A5', 'G5', null, 'E5', 'D5',
+        'E5', 'G5', 'A5', 'B5', 'D6', 'B5', 'A5', 'G5',
+        'B5', 'D5', 'G5', 'F#5', 'E5', null, 'D5', 'B4',
+        'C5', 'E5', 'G5', 'B5', 'A5', null, 'G5', 'E5'
+      ]
+    },
+    boss: {
+      tempo: 152, // fast + urgent
+      chordWave: 'square', chordVol: 0.022, chordDur: 1.1,
+      melodyWave: 'sawtooth', melodyVol: 0.035, melodyDur: 0.32,
+      // Dark D-minor driving loop
+      chords: [
+        ['D3', 'A3', 'D4', 'F4'],
+        ['Bb3', 'F4', 'Bb4', 'D5'],
+        ['F3', 'C4', 'F4', 'A4'],
+        ['A2', 'E4', 'A4', 'C5']
+      ],
+      melody: [
+        'D5', 'F5', 'A5', 'F5', 'E5', null, 'D5', 'C5',
+        'D5', 'F5', 'G5', 'A5', null, 'A5', 'G5', 'F5',
+        'E5', 'D5', 'F5', 'E5', 'D5', null, 'C5', 'A4',
+        'D5', 'F5', 'A5', 'D6', 'A5', null, 'F5', 'D5'
+      ]
+    }
+  },
+
   init() {
     try {
       // Use playback latencyHint to double the internal audio buffer size for TV browsers
@@ -77,7 +138,15 @@ const AudioEngine = {
     }
   },
 
-  playBGM() {
+  // Stop the current theme (if any) and start another. Used to swap between
+  // the nostalgic walk and the boss battle without overlapping schedulers.
+  switchBGM(track) {
+    if (this.currentTrack === track && this.isPlaying) return;
+    this.stopBGM();
+    this.playBGM(track);
+  },
+
+  playBGM(track = 'normal') {
     if (this.isPlaying) return;
     if (!this.ctx) this.init();
     if (!this.ctx) {
@@ -86,29 +155,13 @@ const AudioEngine = {
     }
     this.resume();
     this.isPlaying = true;
+    this.currentTrack = this.bgmTracks[track] ? track : 'normal';
 
-    // Frequencies mapping
-    const notes = {
-      'C3': 130.81, 'E3': 164.81, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
-      'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F#4': 369.99, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
-      'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F#5': 739.99, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77, 'D6': 1174.66
-    };
-
-    // Chord progression: Cmaj7 -> Gmaj7 -> Am7 -> Fmaj7
-    const chords = [
-      ['C3', 'E4', 'G4', 'B4'],
-      ['G3', 'B3', 'D4', 'F#4'],
-      ['A3', 'C4', 'E4', 'G4'],
-      ['F3', 'A3', 'C4', 'E4']
-    ];
-
-    // Beautiful retro melody loop
-    const melody = [
-      'E5', 'G5', 'B5', 'A5', 'G5', null, 'E5', 'D5',
-      'E5', 'G5', 'A5', 'B5', 'D6', 'B5', 'A5', 'G5',
-      'B5', 'D5', 'G5', 'F#5', 'E5', null, 'D5', 'B4',
-      'C5', 'E5', 'G5', 'B5', 'A5', null, 'G5', 'E5'
-    ];
+    const cfg = this.bgmTracks[this.currentTrack];
+    const notes = this.NOTES;
+    const chords = cfg.chords;
+    const melody = cfg.melody;
+    this.tempo = cfg.tempo;
 
     this.startTime = this.ctx.currentTime;
     this.beatNumber = 0;
@@ -117,7 +170,7 @@ const AudioEngine = {
 
     this.schedulerInterval = setInterval(() => {
       if (!this.isPlaying) return;
-      
+
       const currentTime = this.ctx.currentTime;
       const tolerance = 0.150; // 150ms behind window
 
@@ -136,7 +189,7 @@ const AudioEngine = {
         if (this.beatNumber % 4 === 0) {
           const chordIdx = Math.floor(this.beatNumber / 4) % chords.length;
           const chord = chords[chordIdx];
-          
+
           // TV optimization: Only play root and fifth (2 notes) to save CPU/voices
           const isOptimized = !Assets.checkOptimize();
           const activeNotes = isOptimized ? [chord[0], chord[2] || chord[1]] : chord;
@@ -144,7 +197,7 @@ const AudioEngine = {
           activeNotes.forEach(noteName => {
             if (!noteName) return;
             const freq = notes[noteName] || 130.81;
-            this.playSynthNote(freq, noteTime, 1.8, 0.03, 'triangle');
+            this.playSynthNote(freq, noteTime, cfg.chordDur, cfg.chordVol, cfg.chordWave);
           });
         }
 
@@ -152,7 +205,7 @@ const AudioEngine = {
         const melNote = melody[this.beatNumber % melody.length];
         if (melNote) {
           const freq = notes[melNote];
-          this.playSynthNote(freq, noteTime, 0.45, 0.05, 'sine');
+          this.playSynthNote(freq, noteTime, cfg.melodyDur, cfg.melodyVol, cfg.melodyWave);
         }
 
         this.beatNumber++;
@@ -423,6 +476,13 @@ const Game = {
   pickups: [],     // sword/gun pickups
   trampolines: [], // bounce pads
   poofs: [],       // defeat puff FX
+
+  // --- Final boss (the Storm Guardian of Mt. Fuji) ---
+  boss: null,
+  bossActive: false,    // fight in progress (invisible wall up)
+  bossDefeated: false,  // beaten → Fuji photos reveal + path opens
+  bossArenaStart: 13320, // x where the fight begins (after RV camping, before Fuji)
+  bossWallX: 13720,      // Ellen stops here; the boss floats ahead toward Mt. Fuji
   
   // Camera
   camera: {
@@ -463,6 +523,9 @@ const Game = {
     // Hook DOM UI events
     this.bindUI();
 
+    // Hide developer + config UI unless running locally / with ?dev
+    this.applyDevModeVisibility();
+
     // Populate collectibles and hurdles based on milestone layout
     this.setupWorld();
 
@@ -474,6 +537,21 @@ const Game = {
       document.getElementById('loading-screen').classList.remove('active');
       document.getElementById('start-screen').classList.add('active');
     }, 1200);
+  },
+
+  // In the shipped (non-dev) build, hide the Dev Panel, the chapter/memory
+  // selector, the start-screen music toggle and the in-game audio button so
+  // players get a clean experience. Music still plays (the hidden toggle stays
+  // checked). Pass ?dev or run on localhost to re-enable all of it.
+  applyDevModeVisibility() {
+    if (DEV_MODE) return;
+    const hide = (sel) => {
+      const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
+      if (el) el.style.display = 'none';
+    };
+    hide('#dev-panel');
+    hide('#hud-controls');         // chapter select + sound + dev buttons
+    hide('.audio-toggle-container'); // "Play Nostalgic Music" on the start screen
   },
 
   resizeCanvas() {
@@ -527,6 +605,9 @@ const Game = {
     this.trampolines = [];
     this.poofs = [];
     this.banner = null;
+    this.boss = null;
+    this.bossActive = false;
+    this.bossDefeated = false;
     this.allowSecretOnCollect = false;
     this.endingFocusIndex = 0;
     this.heartsCollected = 0;
@@ -534,6 +615,9 @@ const Game = {
     // Reset player combat loadout
     this.player.weapon = null;
     this.player.hasBalls = false;
+    this.player.familyAttackActive = false;
+    this.familyAttackIndex = 0;
+    this.hopTimers = { husband: 0, kid1: 0, kid2: 0, dog: 0 };
     this.player.health = this.player.maxHealth;
     this.player.attackTimer = 0;
     this.player.serveCooldown = 0;
@@ -609,12 +693,14 @@ const Game = {
     const ballsX = 8250; // just past Wedding (x=8000)
     this.ballsX = ballsX;
 
-    // Pickups: tennis racket, then tennis balls
+    // Pickups: tennis racket, tennis balls, and family locket
+    const locketX = this.bossArenaStart - 240;
     this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
     this.pickups.push({ x: ballsX, y: groundY, kind: 'balls', collected: false, frame: 0 });
+    this.pickups.push({ x: locketX, y: groundY, kind: 'locket', collected: false, frame: 0 });
 
     const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
-    const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150;
+    const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150 || Math.abs(x - locketX) < 150;
 
     const groundKinds = ['slime_green', 'slime_purple', 'slime_teal'];
     const flyingKinds = ['cloud', 'bat'];
@@ -648,7 +734,7 @@ const Game = {
     // Flying enemies in the tennis-ball region — alternate normal height and
     // very-high (very-high need a trampoline bounce to arc a serve up to them).
     let fx = ballsX + 340;
-    while (fx < trackEnd - 200) {
+    while (fx < trackEnd - 200 && fx < this.bossArenaStart - 250) {
       if (!nearMilestone(fx)) {
         const section = this.getLevelIndexAtX(fx);
         const high = fi % 2 === 1;
@@ -675,20 +761,20 @@ const Game = {
     for (let x = racketX + 760; x < ballsX - 300; x += 1650) {
       if (!nearMilestone(x) && !nearPickup(x)) highHeartXs.push(x);
     }
-    for (let x = ballsX + 1000; x < trackEnd - 300; x += 1650) {
+    for (let x = ballsX + 1000; x < trackEnd - 300 && x < this.bossArenaStart - 250; x += 1650) {
       if (!nearMilestone(x)) highHeartXs.push(x);
     }
     highHeartXs.forEach((x, i) => {
       // Heart floats high AND off to one side of the pad, drifting back and
       // forth — she must trampoline-bounce then steer forward to grab it.
       const dir = (i % 2 === 0) ? 1 : -1;
-      const heartBaseX = x + dir * 70;
+      const heartBaseX = x + dir * 38;
       this.hearts.push({
-        x: heartBaseX, y: 128, width: 16, height: 16, collected: false,
+        x: heartBaseX, y: 150, width: 16, height: 16, collected: false,
         spawned: true, fromEnemy: false, falling: false, section: this.getLevelIndexAtX(x),
         motion: {
-          baseX: heartBaseX, baseY: 128,
-          ampX: 48, ampY: 20,
+          baseX: heartBaseX, baseY: 150,
+          ampX: 28, ampY: 16,
           speed: 0.04, phase: Math.random() * Math.PI * 2
         }
       });
@@ -786,7 +872,6 @@ const Game = {
     window.addEventListener('keydown', (e) => {
       // Normalize key identifier for TV browsers
       let code = e.code;
-      console.log("Keydown: " + code);
       if (!code) {
         if (e.keyCode === 37) code = 'ArrowLeft';
         else if (e.keyCode === 39) code = 'ArrowRight';
@@ -904,8 +989,8 @@ const Game = {
         }
       }
 
-      // Escape or M key to toggle chapter menu
-      if (code === 'Escape' || code === 'KeyM') {
+      // Escape or M key to toggle chapter menu (dev only)
+      if (DEV_MODE && (code === 'Escape' || code === 'KeyM')) {
         if (menu) {
           if (menu.classList.contains('active')) {
             document.getElementById('close-menu-btn').click();
@@ -929,7 +1014,7 @@ const Game = {
       }
 
       // Teleport shortcuts (1-9 and 0 keys) for dev testing
-      if (code.startsWith('Digit')) {
+      if (DEV_MODE && code.startsWith('Digit')) {
         const num = parseInt(code.replace('Digit', ''));
         let targetLvlIdx = num - 1;
         if (num === 0) targetLvlIdx = 9;
@@ -970,7 +1055,6 @@ const Game = {
         else if (e.keyCode === 68) code = 'KeyD';
         else if (e.keyCode === 87) code = 'KeyW';
       }
-      console.log("Keyup: " + code);
       this.keys[code] = false;
     });
 
@@ -981,9 +1065,11 @@ const Game = {
       // Initialize Audio
       AudioEngine.init();
       if (audioToggle) {
-        AudioEngine.playBGM();
+        AudioEngine.userMusicOn = true;
+        AudioEngine.playBGM('normal');
         document.getElementById('hud-sound-btn').innerText = '🔊';
       } else {
+        AudioEngine.userMusicOn = false;
         document.getElementById('hud-sound-btn').innerText = '🔇';
       }
 
@@ -999,10 +1085,13 @@ const Game = {
     // Audio HUD control
     document.getElementById('hud-sound-btn').addEventListener('click', () => {
       if (AudioEngine.isPlaying) {
+        AudioEngine.userMusicOn = false;
         AudioEngine.stopBGM();
         document.getElementById('hud-sound-btn').innerText = '🔇';
       } else {
-        AudioEngine.playBGM();
+        AudioEngine.userMusicOn = true;
+        // Resume whichever theme fits the moment (boss music mid-fight)
+        AudioEngine.playBGM(this.bossActive && !this.bossDefeated ? 'boss' : 'normal');
         document.getElementById('hud-sound-btn').innerText = '🔊';
       }
       this.canvas.focus();
@@ -1258,12 +1347,15 @@ const Game = {
       if (didJump) {
         this.player.vy = wasmExports.player_vy.value;
         this.player.isGrounded = wasmExports.player_isGrounded.value !== 0;
+        // Carry the pre-jump heading through the arc (see updatePhysics)
+        this.airJumpDir = this.lastWalkDir || 0;
         AudioEngine.playJumpSFX();
       }
     } else {
       if (this.player.isGrounded) {
         this.player.vy = this.player.jumpForce;
         this.player.isGrounded = false;
+        this.airJumpDir = this.lastWalkDir || 0;
         AudioEngine.playJumpSFX();
       }
     }
@@ -1383,12 +1475,21 @@ const Game = {
 
   updatePhysics() {
     // Apply Left/Right movements
-    const walkLeft = (this.keys['KeyA'] || this.keys['ArrowLeft']) ? 1 : 0;
-    const walkRight = (this.keys['KeyD'] || this.keys['ArrowRight']) ? 1 : 0;
+    let walkLeft = (this.keys['KeyA'] || this.keys['ArrowLeft']) ? 1 : 0;
+    let walkRight = (this.keys['KeyD'] || this.keys['ArrowRight']) ? 1 : 0;
     const endX = this.levels[this.levels.length - 1].x;
 
-    if (walkLeft || walkRight) {
-      console.log("walkLeft: " + walkLeft + ", walkRight: " + walkRight + ", wasm: " + !!wasmExports);
+    // --- TV D-pad forward-jump assist ---
+    // A 4-way remote rocker can only register ONE direction at a time, so the
+    // moment you press Up to jump it drops the Right/Left you were holding and
+    // the character stops mid-air. We remember the heading from just before the
+    // jump and carry it through the whole arc so "hold right + up" = a reliable
+    // forward jump (and trampoline bounces keep their momentum too).
+    if (this.player.isGrounded) {
+      this.lastWalkDir = walkLeft ? -1 : (walkRight ? 1 : 0);
+      this.airJumpDir = 0;
+    } else if (!walkLeft && !walkRight && this.airJumpDir) {
+      if (this.airJumpDir > 0) walkRight = 1; else walkLeft = 1;
     }
 
     if (wasmExports) {
@@ -1432,6 +1533,19 @@ const Game = {
       if (this.player.x > endX) this.player.x = endX;
     }
 
+    // --- Final boss: trigger the fight + block the path to Mt. Fuji ---
+    if (!this.bossDefeated && !this.bossActive && this.player.x >= this.bossArenaStart) {
+      this.startBossFight();
+    }
+    if (this.bossActive && !this.bossDefeated && this.player.x > this.bossWallX) {
+      this.player.x = this.bossWallX;
+      this.player.vx = 0;
+      if (wasmExports) {
+        wasmExports.player_x.value = this.bossWallX;
+        wasmExports.player_vx.value = 0;
+      }
+    }
+
     // Set Ellen's outfit based on current level milestone reached
     const lvlIdx = this.getLevelIndexAtX(this.player.x);
     this.player.outfit = this.getEllenOutfit(lvlIdx);
@@ -1451,13 +1565,11 @@ const Game = {
     // Check collectible Heart collisions
     this.hearts.forEach(heart => {
       if (!heart.collected && heart.spawned !== false) {
-        let isColliding = false;
-        if (wasmExports) {
-          isColliding = wasmExports.checkHeartCollision(heart.x, heart.y) !== 0;
-        } else {
-          const dist = Math.hypot((this.player.x - 5) - heart.x, (this.player.y - 35) - heart.y);
-          isColliding = dist < 28;
-        }
+        // Collision resolved in JS (not WASM) with a forgiving radius so a
+        // heart reliably collects whenever Ellen overlaps it — important for
+        // the floating/drifting hearts that were tricky to grab on a TV remote.
+        const dist = Math.hypot((this.player.x - 5) - heart.x, (this.player.y - 35) - heart.y);
+        const isColliding = dist < 38;
 
         if (isColliding) {
           heart.collected = true;
@@ -1523,12 +1635,75 @@ const Game = {
     this._swingId = (this._swingId || 0) + 1; // so one swing damages an enemy once
     AudioEngine.playSlashSFX();
 
-    // Once she's picked up the tennis balls, the same swing serves an arcing ball
-    if (this.player.hasBalls && this.player.serveCooldown <= 0) {
+    // Co-op family attacks or single serve
+    if (this.player.familyAttackActive) {
+      this.fireFamilyAttack();
+    } else if (this.player.hasBalls && this.player.serveCooldown <= 0) {
       this.player.serveCooldown = this.combat.serveCooldown;
       this.serveBall();
       AudioEngine.playShootSFX();
     }
+  },
+
+  fireFamilyAttack() {
+    if (this.familyAttackIndex === undefined) {
+      this.familyAttackIndex = 0;
+    }
+    const currentIdx = this.familyAttackIndex;
+    this.familyAttackIndex = (this.familyAttackIndex + 1) % 5;
+
+    const dir = this.player.dir;
+    let spawnX = this.player.x;
+    let spawnY = this.player.y - 36;
+    let pType = 'tennis_ball';
+
+    if (currentIdx === 0) {
+      // Ellen (player)
+      spawnX = this.player.x + dir * 20;
+      spawnY = this.player.y - 36;
+      pType = 'tennis_ball';
+      AudioEngine.playShootSFX();
+    } else {
+      let compType = '';
+      if (currentIdx === 1) {
+        compType = 'husband';
+        pType = 'volleyball';
+      } else if (currentIdx === 2) {
+        compType = 'kid1';
+        pType = 'nunchucks';
+      } else if (currentIdx === 3) {
+        compType = 'kid2';
+        pType = Math.random() < 0.5 ? 'apple' : 'avocado';
+      } else if (currentIdx === 4) {
+        compType = 'dog';
+        pType = 'dog_treat';
+      }
+
+      const comp = this.companions.find(c => c.type === compType);
+      if (comp) {
+        spawnX = comp.x;
+        spawnY = comp.y - 20;
+        if (this.hopTimers) {
+          this.hopTimers[compType] = 15;
+        }
+      } else {
+        spawnX = this.player.x + dir * 20;
+        spawnY = this.player.y - 36;
+      }
+      AudioEngine.playShootSFX();
+    }
+
+    this.projectiles.push({
+      x: spawnX,
+      y: spawnY,
+      vx: dir * this.combat.ballSpeedX,
+      vy: this.combat.ballSpeedY,
+      spin: 0,
+      bounced: false,
+      dir,
+      alive: true,
+      type: pType
+    });
   },
 
   serveBall() {
@@ -1574,6 +1749,130 @@ const Game = {
     }
   },
 
+  // ============================================================
+  // FINAL BOSS — the Storm Guardian of Mt. Fuji
+  // ============================================================
+  startBossFight() {
+    this.bossActive = true;
+    this.boss = {
+      // Hovers ahead of Ellen, in front of Mt. Fuji, so she faces right to fight it
+      homeX: this.bossWallX + 230,
+      x: this.bossWallX + 230,
+      baseY: 200, y: 120,
+      w: 120, h: 120,
+      hp: 18, maxHp: 18,
+      alive: true, dir: -1, frame: 0,
+      hitFlash: 0, lastSwingHit: -1,
+      shootTimer: 90,
+      swoopTimer: 260, swooping: false, swoopProg: 0,
+      introT: 100 // brief grace before it starts attacking
+    };
+    this.banner = { timer: 320, text: '⚡ The Storm Guardian blocks the path to Mt. Fuji — defeat it!' };
+    if (AudioEngine.userMusicOn) AudioEngine.switchBGM('boss');
+  },
+
+  updateBoss() {
+    const b = this.boss;
+    if (!b || !b.alive) return;
+    b.frame++;
+    if (b.introT > 0) b.introT--;
+    if (b.hitFlash > 0) b.hitFlash--;
+
+    // Gets faster + meaner once it's below half health
+    const enraged = b.hp <= b.maxHp / 2;
+
+    // Movement: patrol with a sine sweep, periodically dive-bomb at Ellen
+    if (!b.swooping) {
+      b.swoopTimer--;
+      if (b.swoopTimer <= 0 && b.introT <= 0) {
+        b.swooping = true;
+        b.swoopProg = 0;
+      }
+    }
+
+    let targetX, targetY;
+    if (b.swooping) {
+      b.swoopProg += enraged ? 0.022 : 0.016;
+      const dive = Math.sin(Math.min(1, b.swoopProg) * Math.PI); // 0 -> 1 -> 0
+      targetX = b.homeX + (this.player.x - b.homeX) * dive * 0.85;
+      targetY = b.baseY + dive * 150;
+      if (b.swoopProg >= 1) {
+        b.swooping = false;
+        b.swoopTimer = enraged ? 150 : 240;
+      }
+    } else {
+      targetX = b.homeX + Math.sin(b.frame * 0.015) * 150;
+      targetY = b.baseY + Math.sin(b.frame * 0.05) * 22;
+    }
+    b.x += (targetX - b.x) * 0.08;
+    b.y += (targetY - b.y) * 0.10;
+    // Keep it ahead of Ellen, on the Mt. Fuji side of the wall
+    if (b.x < this.bossWallX + 30) b.x = this.bossWallX + 30;
+    b.dir = (this.player.x < b.x) ? -1 : 1;
+
+    // Ranged attack: aimed projectile spread
+    if (b.introT <= 0) {
+      b.shootTimer--;
+      if (b.shootTimer <= 0) {
+        this.bossShoot(enraged);
+        b.shootTimer = enraged ? 52 : 88;
+      }
+    }
+
+    // Contact damage
+    const playerMidY = this.player.y - 28;
+    if (Math.abs(b.x - this.player.x) < b.w * 0.42 && Math.abs(b.y - playerMidY) < b.h * 0.42) {
+      this.damagePlayer();
+    }
+  },
+
+  bossShoot(enraged) {
+    const b = this.boss;
+    const playerMidY = this.player.y - 28;
+    const baseAng = Math.atan2(playerMidY - b.y, this.player.x - b.x);
+    const spread = enraged ? [-0.3, -0.1, 0.1, 0.3] : [-0.18, 0.18];
+    const sp = this.combat.enemyBulletSpeed * 1.1;
+    spread.forEach(off => {
+      const a = baseAng + off;
+      this.enemyProjectiles.push({
+        x: b.x, y: b.y + 18,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        kind: 'bat', frame: 0, alive: true
+      });
+    });
+    AudioEngine.playShootSFX();
+  },
+
+  hitBoss(dmg) {
+    const b = this.boss;
+    if (!b || !b.alive) return;
+    b.hp -= dmg;
+    b.hitFlash = 10;
+    if (b.hp <= 0) {
+      b.hp = 0;
+      this.defeatBoss();
+    } else {
+      AudioEngine.playEnemyHurtSFX();
+    }
+  },
+
+  defeatBoss() {
+    const b = this.boss;
+    b.alive = false;
+    this.bossActive = false;
+    this.bossDefeated = true;
+    this.enemyProjectiles = [];
+    // A flurry of celebratory poofs where it fell
+    for (let i = 0; i < 5; i++) {
+      this.poofs.push({ x: b.x + (Math.random() - 0.5) * 70, y: b.y + (Math.random() - 0.5) * 70, progress: i * 0.12 });
+    }
+    AudioEngine.playEnemyDefeatSFX();
+    AudioEngine.playWinSFX();
+    // Back to the gentle nostalgic theme for the Fuji finale
+    if (AudioEngine.userMusicOn) AudioEngine.switchBGM('normal');
+    this.banner = { timer: 360, text: '🌸 The Storm Guardian falls — the path to Mt. Fuji opens! 🗻' };
+  },
+
   damagePlayer() {
     if (this.player.invuln > 0 || this.player.isDead) return;
     this.player.health -= 1;
@@ -1608,7 +1907,15 @@ const Game = {
     if (this.player.invuln > 0) this.player.invuln--;
     if (this.banner && this.banner.timer > 0) this.banner.timer--;
 
-    // --- Pickups (tennis racket, then tennis balls) ---
+    // Tick companion hop timers
+    if (this.hopTimers) {
+      if (this.hopTimers.husband > 0) this.hopTimers.husband--;
+      if (this.hopTimers.kid1 > 0) this.hopTimers.kid1--;
+      if (this.hopTimers.kid2 > 0) this.hopTimers.kid2--;
+      if (this.hopTimers.dog > 0) this.hopTimers.dog--;
+    }
+
+    // --- Pickups (tennis racket, tennis balls, and locket of unity) ---
     this.pickups.forEach(pk => {
       if (pk.collected) return;
       pk.frame++;
@@ -1627,6 +1934,13 @@ const Game = {
             timer: 240,
             text: '🎾 Tennis balls! Your swing now serves an arcing ball — jump & serve at the clouds'
           };
+        } else if (pk.kind === 'locket') {
+          this.player.familyAttackActive = true;
+          AudioEngine.playWinSFX();
+          this.banner = {
+            timer: 300,
+            text: '💖 Locket of Unity! The family joins the fight with custom alternate attacks! 👨‍👩‍👧‍👦'
+          };
         }
       }
     });
@@ -1639,6 +1953,8 @@ const Game = {
         this.player.vy = this.combat.trampolineForce;
         this.player.y = t.y - 16;
         this.player.isGrounded = false;
+        // Keep the run-up heading so she can steer to the high hearts mid-bounce
+        this.airJumpDir = this.lastWalkDir || 0;
         if (wasmExports) {
           wasmExports.player_vy.value = this.combat.trampolineForce;
           wasmExports.player_y.value = t.y - 16;
@@ -1685,6 +2001,23 @@ const Game = {
         this.damagePlayer();
       }
     });
+
+    // --- Final boss update (movement, attacks, contact damage) ---
+    if (this.bossActive && this.boss && this.boss.alive) {
+      this.updateBoss();
+    }
+
+    // --- Racket swing can also hit the boss when it dives low enough ---
+    if (this.player.weapon === 'racket' && this.player.attackTimer > 0 &&
+        this.boss && this.boss.alive && this.boss.lastSwingHit !== this._swingId) {
+      const b = this.boss;
+      const dir = this.player.dir;
+      const dx = (b.x - this.player.x) * dir;
+      if (dx > -30 && dx < this.combat.swingReach + 40 && Math.abs(b.y - playerMidY) < 80) {
+        b.lastSwingHit = this._swingId;
+        this.hitBoss(1);
+      }
+    }
 
     // --- Racket swing hit resolution (ground enemies only) ---
     // One swing damages a given enemy at most once (guarded by swing id), so a
@@ -1733,6 +2066,13 @@ const Game = {
           p.alive = false;
         }
       });
+      // Served tennis balls are the main way to chip down the floating boss
+      if (p.alive && this.boss && this.boss.alive &&
+          Math.abs(this.boss.x - p.x) < this.boss.w * 0.45 &&
+          Math.abs(this.boss.y - p.y) < this.boss.h * 0.45) {
+        this.hitBoss(1);
+        p.alive = false;
+      }
     });
     if (this.projectiles.length) {
       this.projectiles = this.projectiles.filter(p => p.alive);
@@ -1818,6 +2158,14 @@ const Game = {
     this.projectiles = [];
     this.enemyProjectiles = [];
     this.poofs = [];
+
+    // If she fell to the boss, clear it so the fight restarts when she walks back in
+    if (this.boss && !this.bossDefeated) {
+      this.boss = null;
+      this.bossActive = false;
+      if (AudioEngine.userMusicOn) AudioEngine.switchBGM('normal');
+    }
+
     this.heartsCollected = this.hearts.filter(h => h.collected).length;
 
     this.player.health = this.player.maxHealth;
@@ -2104,10 +2452,13 @@ const Game = {
 
     // Draw Floating Polaroid Photos in the sky
     this.levels.forEach((lvl, idx) => {
+      // The Mt. Fuji memory stays sealed until the Storm Guardian is defeated
+      if (idx === this.levels.length - 1 && !this.bossDefeated) return;
+
       const relativeX = lvl.x - this.camera.x;
       // Float card in the sky
       const py = 125;
-      
+
       const dist = Math.abs(this.player.x - lvl.x);
       
       // Calculate opacity: starts fading in 420px away
@@ -2276,11 +2627,28 @@ const Game = {
       }
     });
 
-    // Draw projectiles (player's served tennis balls)
+    // Draw the final boss
+    if (this.boss && this.boss.alive) {
+      this.drawBoss(this.boss.x - camX, this.boss.y, this.boss);
+    }
+
+    // Draw projectiles (family cooperative projectiles)
     this.projectiles.forEach(p => {
       const rx = p.x - camX;
       if (rx > -30 && rx < this.width + 30) {
-        Assets.drawBullet(this.ctx, rx, p.y, p.dir, p.spin);
+        if (p.type === 'volleyball') {
+          Assets.drawVolleyball(this.ctx, rx, p.y, p.dir, p.spin);
+        } else if (p.type === 'nunchucks') {
+          Assets.drawNunchucks(this.ctx, rx, p.y, p.dir, p.spin);
+        } else if (p.type === 'apple') {
+          Assets.drawApple(this.ctx, rx, p.y, p.dir, p.spin);
+        } else if (p.type === 'avocado') {
+          Assets.drawAvocado(this.ctx, rx, p.y, p.dir, p.spin);
+        } else if (p.type === 'dog_treat') {
+          Assets.drawDogTreat(this.ctx, rx, p.y, p.dir, p.spin);
+        } else {
+          Assets.drawBullet(this.ctx, rx, p.y, p.dir, p.spin);
+        }
       }
     });
 
@@ -2305,13 +2673,21 @@ const Game = {
     this.companions.forEach(comp => {
       const rx = comp.x - camX;
       if (rx > -60 && rx < this.width + 60) {
+        let drawY = comp.y;
+        const hopVal = this.hopTimers ? this.hopTimers[comp.type] : 0;
+        if (hopVal > 0) {
+          const progress = hopVal / 15;
+          const hopHeight = 24 * Math.sin(progress * Math.PI);
+          drawY -= hopHeight;
+        }
+
         if (comp.type === 'dog') {
-          Assets.drawDog(this.ctx, rx, comp.y, comp.frame, comp.dir);
+          Assets.drawDog(this.ctx, rx, drawY, comp.frame, comp.dir);
         } else if (comp.type === 'husband') {
-          Assets.drawHusband(this.ctx, rx, comp.y, comp.outfit, comp.frame, comp.dir);
+          Assets.drawHusband(this.ctx, rx, drawY, comp.outfit, comp.frame, comp.dir);
         } else {
           // kids (baby stroller, kid1, kid2)
-          Assets.drawKid(this.ctx, rx, comp.y, comp.type, comp.frame, comp.dir, lvlIdx);
+          Assets.drawKid(this.ctx, rx, drawY, comp.type, comp.frame, comp.dir, lvlIdx);
         }
       }
     });
@@ -2347,6 +2723,79 @@ const Game = {
 
     // HUD overlays rendered on canvas
     this.drawHUD();
+  },
+
+  // The Storm Guardian: a dark thundercloud oni hovering before Mt. Fuji
+  drawBoss(cx, cy, b) {
+    const ctx = this.ctx;
+    const t = b.frame;
+    const flash = b.hitFlash > 0;
+    const r = b.w * 0.5;
+    ctx.save();
+
+    // Glowing storm aura
+    ctx.shadowColor = flash ? '#ffffff' : 'rgba(150,90,255,0.85)';
+    ctx.shadowBlur = 26;
+
+    // Cloud body: a cluster of dark puffs
+    ctx.fillStyle = flash ? '#ffffff' : '#2a2440';
+    const puffs = [[-0.32, -0.05, 0.42], [0.32, -0.05, 0.42], [0, -0.28, 0.46], [0, 0.12, 0.5], [-0.5, 0.12, 0.32], [0.5, 0.12, 0.32]];
+    puffs.forEach(([ox, oy, pr]) => {
+      ctx.beginPath();
+      ctx.arc(cx + ox * b.w, cy + oy * b.w + Math.sin(t * 0.1 + ox) * 2, pr * r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.shadowBlur = 0;
+
+    // Lighter inner highlight
+    ctx.fillStyle = flash ? '#ffffff' : '#473a6e';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 0.06 * b.w, r * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Angry glowing eyes
+    const eyeColor = flash ? '#000' : '#ffe14d';
+    const ey = cy - 0.02 * b.w;
+    const ex = 0.18 * b.w;
+    [-1, 1].forEach(s => {
+      ctx.save();
+      ctx.translate(cx + s * ex, ey);
+      ctx.rotate(s * 0.3);
+      ctx.fillStyle = eyeColor;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 0.11 * b.w, 0.06 * b.w, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#b22';
+      ctx.beginPath();
+      ctx.arc(s * 2, 0, 0.035 * b.w, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Jagged angry mouth
+    ctx.strokeStyle = flash ? '#000' : '#ffe14d';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const my = cy + 0.2 * b.w;
+    ctx.moveTo(cx - 0.18 * b.w, my);
+    ctx.lineTo(cx - 0.06 * b.w, my + 0.06 * b.w);
+    ctx.lineTo(cx + 0.06 * b.w, my);
+    ctx.lineTo(cx + 0.18 * b.w, my + 0.06 * b.w);
+    ctx.stroke();
+
+    // Crackling lightning bolts
+    if (Math.floor(t * 0.2) % 5 === 0) {
+      ctx.strokeStyle = 'rgba(180,220,255,0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const lx = cx + (Math.random() - 0.5) * b.w;
+      ctx.moveTo(lx, cy);
+      ctx.lineTo(lx + 6, cy + 12);
+      ctx.lineTo(lx - 4, cy + 20);
+      ctx.lineTo(lx + 8, cy + 34);
+      ctx.stroke();
+    }
+    ctx.restore();
   },
 
   drawHUD() {
@@ -2395,15 +2844,44 @@ const Game = {
 
     // --- Weapon badge ---
     if (this.player.weapon) {
-      const wName = this.player.hasBalls ? 'Racket + Balls' : 'Racket';
+      let wName = this.player.hasBalls ? 'Racket + Balls' : 'Racket';
+      let wIcon = '🎾';
+      let wWidth = this.player.hasBalls ? 128 : 86;
+      if (this.player.familyAttackActive) {
+        wName = 'Family Unity 👨‍👩‍👧‍👦';
+        wIcon = '💖';
+        wWidth = 145;
+      }
       this.ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      this.ctx.fillRect(hbX - 6, hbY + 14, this.player.hasBalls ? 128 : 86, 22);
+      this.ctx.fillRect(hbX - 6, hbY + 14, wWidth, 22);
       this.ctx.font = '14px Outfit';
       this.ctx.textAlign = 'left';
-      this.ctx.fillText('🎾', hbX - 2, hbY + 30);
+      this.ctx.fillText(wIcon, hbX - 2, hbY + 30);
       this.ctx.fillStyle = '#fff';
       this.ctx.font = '600 12px Outfit';
       this.ctx.fillText(wName, hbX + 20, hbY + 30);
+    }
+
+    // --- Boss health bar ---
+    if (this.boss && this.boss.alive) {
+      const bw = 360, bh = 16;
+      const bx = this.width / 2 - bw / 2, by = this.height - 38;
+      this.ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      this.ctx.fillRect(bx - 6, by - 24, bw + 12, bh + 30);
+      this.ctx.fillStyle = '#fff';
+      this.ctx.font = '700 13px Outfit';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('⚡ Storm Guardian of Mt. Fuji', this.width / 2, by - 8);
+      this.ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      this.ctx.fillRect(bx, by, bw, bh);
+      const frac = Math.max(0, this.boss.hp / this.boss.maxHp);
+      const grad = this.ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      grad.addColorStop(0, '#ff4d6d');
+      grad.addColorStop(1, '#b14bff');
+      this.ctx.fillStyle = grad;
+      this.ctx.fillRect(bx, by, bw * frac, bh);
+      this.ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      this.ctx.strokeRect(bx, by, bw, bh);
     }
 
     // --- Pickup / tip banner ---
@@ -2596,10 +3074,10 @@ const Game = {
         this.gamepadBtnAPressed = false;
       }
 
-      // Start button or Select button to toggle chapter menu
+      // Start button or Select button to toggle chapter menu (dev only)
       const btnStart = gp.buttons[9] ? gp.buttons[9].pressed : false;
       const btnSelect = gp.buttons[8] ? gp.buttons[8].pressed : false;
-      if (btnStart || btnSelect) {
+      if (DEV_MODE && (btnStart || btnSelect)) {
         if (!this.gamepadMenuPressed) {
           const menu = document.getElementById('chapter-menu-overlay');
           if (menu) {
