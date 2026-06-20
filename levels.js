@@ -253,6 +253,9 @@ const levelsData = [
     year: "2026",
     x: 14000,
     photos: ["photos/mt_fuji.jpg", "photos/IMG_2680.JPG", "photos/IMG_2817.jpg"],
+    // Shift the floating photos to the upper-right so they don't cover the mountain
+    cardDX: 175,
+    cardDY: -12,
     skyGradient: {
       top: "#ff7e5f",
       bottom: "#feb47b"

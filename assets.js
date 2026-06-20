@@ -1346,22 +1346,22 @@ const Assets = {
       const cachedFuji = this.getCached(
         fujiKey,
         (offscreenCtx) => {
-          this.drawFuji(offscreenCtx, 0, 0, 680, 370);
+          this.drawFuji(offscreenCtx, 0, 0, 820, 415);
         },
-        720,
-        380,
-        360,
-        370
+        840,
+        470,
+        420,
+        420
       );
 
       ctx.save();
       ctx.translate(stageX, 420);
-      ctx.drawImage(cachedFuji, -360, -370);
+      ctx.drawImage(cachedFuji, -420, -420);
       ctx.restore();
 
       ctx.save();
       ctx.translate(0, 420);
-      this.drawCherryBranch(ctx, stageX - 120, -260, time);
+      this.drawCherryBranch(ctx, stageX - 150, -300, time);
       ctx.restore();
       return;
     }
@@ -1591,9 +1591,9 @@ const Assets = {
         break;
 
       case 10: // Mt Fuji and Cherry Blossom
-        this.drawFuji(ctx, stageX, 0, 680, 370); // Larger and more majestic!
+        this.drawFuji(ctx, stageX, 0, 820, 415); // Larger and more majestic!
         // Cherry blossoms branch framing the view
-        this.drawCherryBranch(ctx, stageX - 120, -260, time);
+        this.drawCherryBranch(ctx, stageX - 150, -300, time);
         break;
 
       case 11: // Started Dating: Park bench under a blossom tree
@@ -3073,6 +3073,52 @@ const Assets = {
         ctx.beginPath();
         ctx.moveTo(-6, -8); ctx.lineTo(0, -6);
         ctx.moveTo(12, -7); ctx.lineTo(5, -6);
+        ctx.stroke();
+      }
+    } else if (kind === 'wasp') {
+      // Low-hovering striped wasp — a melee-focused aerial foe
+      ctx.translate(0, wob);
+      const flap = Math.abs(Math.sin(frame * 0.8)) * 5;
+      // translucent buzzing wings
+      ctx.fillStyle = flash ? '#fff' : 'rgba(220,235,255,0.7)';
+      ctx.beginPath();
+      ctx.ellipse(-3, -7 - flap * 0.3, 7, 4, -0.5, 0, Math.PI * 2);
+      ctx.ellipse(3, -7 - flap * 0.3, 7, 4, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      // body
+      ctx.fillStyle = flash ? '#fff' : '#f2b705';
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 9, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!flash) {
+        // stripes
+        ctx.fillStyle = '#1a1a1a';
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.ellipse(i * 4, 2, 1.6, 7 - Math.abs(i) * 1.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // stinger
+        ctx.beginPath();
+        ctx.moveTo(9, 2); ctx.lineTo(15, 2); ctx.lineTo(9, 5); ctx.closePath();
+        ctx.fill();
+        // eyes
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(-5, -1, 2.4, 0, Math.PI * 2);
+        ctx.arc(-0.5, -1, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.arc(-5, -1, 1.1, 0, Math.PI * 2);
+        ctx.arc(-0.5, -1, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+        // angry brow
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-8, -4); ctx.lineTo(-3, -2);
+        ctx.moveTo(-3, -4); ctx.lineTo(1, -2);
         ctx.stroke();
       }
     }

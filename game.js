@@ -452,8 +452,10 @@ const Game = {
   combat: {
     swingDuration: 16,   // frames a racket swing stays active
     swingReach: 60,      // px in front of player a racket swing hits
+    swingVReach: 58,     // vertical reach of the racket (easily clips aerial foes)
     karateDuration: 12,  // frames a karate chop stays active (snappier)
     karateReach: 36,     // px in front — shorter reach than the racket
+    karateVReach: 30,    // vertical reach — must be near apex to clip aerial foes
     serveCooldown: 20,   // frames between served tennis balls
     ballSpeedX: 8.5,     // arcing tennis-ball launch (horizontal)
     ballSpeedY: -10,     // arcing tennis-ball launch (upward)
@@ -491,8 +493,9 @@ const Game = {
   bossActive: false,    // fight in progress (invisible wall up)
   bossDefeated: false,  // beaten → Fuji photos reveal + path opens
   bossArenaStart: 13320, // x where the fight begins (after RV camping, before Fuji)
-  bossWallX: 13720,      // Ellen stops here; the boss floats ahead toward Mt. Fuji
+  bossWallX: 13900,      // Ellen can roam the full arena up to here (just shy of Fuji)
   fujiRevealProgress: 0, // 0 = Mt. Fuji shrouded in storm clouds, 1 = fully revealed
+  viewZoom: 1,           // <1 zooms the camera out (boss arena gets a wide cinematic view)
 
   // Camera
   camera: {
@@ -619,6 +622,7 @@ const Game = {
     this.bossActive = false;
     this.bossDefeated = false;
     this.fujiRevealProgress = 0;
+    this.viewZoom = 1;
     this.allowSecretOnCollect = false;
     this.endingFocusIndex = 0;
     this.heartsCollected = 0;
@@ -636,6 +640,14 @@ const Game = {
     this.player.invuln = 0;
     this.player.isDead = false;
     this.shout = null;
+
+    // Progressive control hints floating in the sky near the start. Each fades
+    // in as Ellen walks up to it and fades out as she passes: walk -> jump -> chop.
+    this.tutorialHints = [
+      { x: 330, title: 'Hold ➡️ to walk', sub: 'D-pad right • or ➡️ / D' },
+      { x: 720, title: 'Press ⬆️ to jump', sub: 'D-pad up • or Space / W' },
+      { x: 1120, title: 'Press ● to karate chop', sub: 'Select • or Enter / F — "Aya!"' }
+    ];
 
     // Setup hearts & hurdles along the entire track
     const walkLimitX = this.levels[this.levels.length - 1].x;
@@ -712,7 +724,6 @@ const Game = {
     const locketX = this.bossArenaStart - 240;
     this.locketX = locketX;
     this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
-    this.pickups.push({ x: ballsX, y: groundY, kind: 'balls', collected: false, frame: 0 });
     this.pickups.push({ x: locketX, y: groundY, kind: 'locket', collected: false, frame: 0 });
 
     const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
@@ -751,14 +762,35 @@ const Game = {
       gx += 720 - 300 * progress(gx); // ~720 early -> ~470 late
     }
 
-    // Flying enemies in the tennis-ball region — alternate normal height and
-    // very-high (very-high need a trampoline bounce to arc a serve up to them).
+    // Low-hovering wasps across the early-to-mid journey. They sit at a jump-to-
+    // hit height: with a karate chop you must connect near the very top of a jump
+    // (short vertical reach = tricky), but the racket's taller reach clips them
+    // easily — so they showcase the karate->racket upgrade. They don't shoot.
+    let wx = 1750, wi = 0;
+    while (wx < ballsX - 200) {
+      if (!nearMilestone(wx) && !nearPickup(wx)) {
+        this.enemies.push({
+          type: 'flying', kind: 'wasp',
+          x: wx, homeX: wx, y: 250, baseY: 250,
+          alive: true, dir: -1, range: 46, hitFlash: 0,
+          frame: (wi * 17) % 60, section: this.getLevelIndexAtX(wx), high: false,
+          heart: null, tier: 1, hp: 1, maxHp: 1, lastSwingHit: -1
+        });
+        wi++;
+      }
+      wx += 1450;
+    }
+
+    // Flying enemies in the latter half — alternate normal height and very-high.
+    // Normal ones are jump/racket reachable; the very-high ones float ABOVE melee
+    // reach, so the only way to defeat them is to whack their projectiles back.
+    // (No trampolines here — those are reserved for the high-heart pads.)
     let fx = ballsX + 340;
     while (fx < trackEnd - 200 && fx < this.bossArenaStart - 250) {
       if (!nearMilestone(fx)) {
         const section = this.getLevelIndexAtX(fx);
         const high = fi % 2 === 1;
-        const baseY = high ? 165 : 290;
+        const baseY = high ? 150 : 290; // 150 = out of melee reach (whack-back only)
         const tier = Math.random() < toughChance(section) ? 2 : 1;
         this.enemies.push({
           type: 'flying', kind: flyingKinds[fi % flyingKinds.length],
@@ -766,11 +798,9 @@ const Game = {
           alive: true, dir: -1, range: 70, hitFlash: 0,
           frame: (fi * 13) % 60, section, high, heart: null,
           tier, hp: tier, maxHp: tier, lastSwingHit: -1,
-          shootTimer: 60 + Math.floor(Math.random() * 120) // flying foes shoot back
+          // High foes shoot more often so you always have a projectile to return
+          shootTimer: 50 + Math.floor(Math.random() * (high ? 70 : 120))
         });
-        if (high) {
-          this.trampolines.push({ x: fx, y: groundY, w: 58, squash: 0 });
-        }
         fi++;
       }
       fx += 760 - 280 * progress(fx); // ~620 -> ~480 late
@@ -877,10 +907,6 @@ const Game = {
     if (this.player.x >= (this.racketX || 3600)) {
       this.player.weapon = 'racket';
       this.pickups.forEach(p => { if (p.kind === 'racket') p.collected = true; });
-    }
-    if (this.ballsX && this.player.x >= this.ballsX) {
-      this.player.hasBalls = true;
-      this.pickups.forEach(p => { if (p.kind === 'balls') p.collected = true; });
     }
     // Family locket (all 5 join the attack) — grant + consume only past its spot
     if (this.locketX && this.player.x >= this.locketX) {
@@ -1086,18 +1112,13 @@ const Game = {
 
     // Start Button
     document.getElementById('start-btn').addEventListener('click', () => {
-      const audioToggle = document.getElementById('music-toggle').checked;
-      
-      // Initialize Audio
+      // Music plays by default now (the start-screen toggle was removed). The
+      // click itself is the user gesture that lets the browser start audio.
       AudioEngine.init();
-      if (audioToggle) {
-        AudioEngine.userMusicOn = true;
-        AudioEngine.playBGM('normal');
-        document.getElementById('hud-sound-btn').innerText = '🔊';
-      } else {
-        AudioEngine.userMusicOn = false;
-        document.getElementById('hud-sound-btn').innerText = '🔇';
-      }
+      AudioEngine.userMusicOn = true;
+      AudioEngine.playBGM('normal');
+      const soundBtn = document.getElementById('hud-sound-btn');
+      if (soundBtn) soundBtn.innerText = '🔊';
 
       document.getElementById('start-screen').classList.remove('active');
       this.startGame();
@@ -1331,10 +1352,6 @@ const Game = {
 
   startGame() {
     this.canvas.focus();
-    this.banner = {
-      timer: 300,
-      text: '🥋 Press SELECT / Enter to karate chop — "Aya!" Grab the tennis racket later for more reach'
-    };
     this.ensureLoop();
   },
 
@@ -1567,12 +1584,19 @@ const Game = {
     if (!this.bossDefeated && !this.bossActive && this.player.x >= this.bossArenaStart) {
       this.startBossFight();
     }
-    if (this.bossActive && !this.bossDefeated && this.player.x > this.bossWallX) {
-      this.player.x = this.bossWallX;
-      this.player.vx = 0;
-      if (wasmExports) {
-        wasmExports.player_x.value = this.bossWallX;
-        wasmExports.player_vx.value = 0;
+    if (this.bossActive && !this.bossDefeated) {
+      // Keep Ellen inside the arena (right wall + a left bound so she stays in frame)
+      const leftBound = this.bossArenaStart - 60;
+      let clamped = null;
+      if (this.player.x > this.bossWallX) clamped = this.bossWallX;
+      else if (this.player.x < leftBound) clamped = leftBound;
+      if (clamped !== null) {
+        this.player.x = clamped;
+        this.player.vx = 0;
+        if (wasmExports) {
+          wasmExports.player_x.value = clamped;
+          wasmExports.player_vx.value = 0;
+        }
       }
     }
 
@@ -1585,12 +1609,19 @@ const Game = {
     this.updateCompanions(lvlIdx);
 
     // --- CAMERA SCROLL SYSTEM ---
-    // Camera centers horizontally on the player
-    const targetCamX = this.player.x - this.width / 3;
-    this.camera.x += (targetCamX - this.camera.x) * 0.1;
+    // During the boss fight the camera locks to frame the whole arena + mountain
+    // and zooms out; otherwise it follows the player.
+    const inBossFight = this.bossActive && !this.bossDefeated;
+    const targetCamX = inBossFight ? 13150 : (this.player.x - this.width / 3);
+    this.camera.x += (targetCamX - this.camera.x) * 0.08;
     // Lock camera boundaries
     if (this.camera.x < 0) this.camera.x = 0;
     if (this.camera.x > endX - this.width + 250) this.camera.x = endX - this.width + 250;
+
+    // Smoothly zoom the view out for the boss arena, back in afterward
+    const zoomTarget = inBossFight ? 0.72 : 1;
+    this.viewZoom += (zoomTarget - this.viewZoom) * 0.06;
+    if (Math.abs(this.viewZoom - zoomTarget) < 0.003) this.viewZoom = zoomTarget;
 
     // Check collectible Heart collisions
     this.hearts.forEach(heart => {
@@ -1672,13 +1703,11 @@ const Game = {
       this.shout = { text: 'Aya!', timer: this.player.attackMax + 10 };
     }
 
-    // Co-op family attacks or single serve (only ever active once she has the racket)
+    // Late-game family co-op attack (from the Locket of Unity). The standalone
+    // tennis-ball serve was removed — ranged offense now comes from whacking
+    // enemy projectiles back at them with the racket.
     if (this.player.familyAttackActive) {
       this.fireFamilyAttack();
-    } else if (this.player.hasBalls && this.player.serveCooldown <= 0) {
-      this.player.serveCooldown = this.combat.serveCooldown;
-      this.serveBall();
-      AudioEngine.playShootSFX();
     }
   },
 
@@ -1743,20 +1772,6 @@ const Game = {
     });
   },
 
-  serveBall() {
-    const dir = this.player.dir;
-    this.projectiles.push({
-      x: this.player.x + dir * 20,
-      y: this.player.y - 36,
-      vx: dir * this.combat.ballSpeedX,
-      vy: this.combat.ballSpeedY, // launches upward, gravity arcs it back down
-      spin: 0,
-      bounced: false,
-      dir,
-      alive: true
-    });
-  },
-
   // Apply damage to an enemy. Tougher (2-hit) monsters flash when hurt but
   // survive until their hp runs out.
   hitEnemy(e, dmg) {
@@ -1792,16 +1807,14 @@ const Game = {
   startBossFight() {
     this.bossActive = true;
     this.boss = {
-      // Hovers ahead of Ellen, in front of Mt. Fuji, so she faces right to fight it
-      homeX: this.bossWallX + 230,
-      x: this.bossWallX + 230,
-      baseY: 200, y: 120,
+      homeX: 13950, x: 13950,
+      baseY: 170, y: 90,
       w: 120, h: 120,
-      hp: 12, maxHp: 12, // Balanced down from 18 HP
+      hp: 12, maxHp: 12,
       alive: true, dir: -1, frame: 0,
       hitFlash: 0, lastSwingHit: -1,
-      shootTimer: 120, // Increased initial wait
-      swoopTimer: 260, swooping: false, swoopProg: 0,
+      shootTimer: 110,
+      swoopTimer: 240, swooping: false, swoopProg: 0,
       introT: 100 // brief grace before it starts attacking
     };
     this.banner = { timer: 320, text: '⚡ The Storm Guardian blocks the path to Mt. Fuji — defeat it!' };
@@ -1818,33 +1831,43 @@ const Game = {
     // Gets faster + meaner once it's below half health
     const enraged = b.hp <= b.maxHp / 2;
 
-    // Movement: patrol with a sine sweep, periodically dive-bomb at Ellen
-    if (!b.swooping) {
-      b.swoopTimer--;
-      if (b.swoopTimer <= 0 && b.introT <= 0) {
-        b.swooping = true;
-        b.swoopProg = 0;
-      }
+    // Arena bounds the boss zips across (full width, in front of the mountain)
+    const arenaL = this.bossArenaStart + 30;   // ~13350
+    const arenaR = this.bossWallX + 260;        // ~14160
+
+    // Default: brisk full-width left<->right sweep + a vertical weave that uses
+    // the upper sky.
+    const sweepSpeed = enraged ? 0.020 : 0.014;
+    let targetX = arenaL + (0.5 + 0.5 * Math.sin(b.frame * sweepSpeed)) * (arenaR - arenaL);
+    let targetY = b.baseY + Math.sin(b.frame * 0.05) * 95; // ~75..265
+
+    // Evasion: if Ellen is near or mid-swing, bolt the other way and climb high
+    const pdx = this.player.x - b.x;
+    if (b.introT <= 0 && (this.player.attackTimer > 0 || Math.abs(pdx) < 175)) {
+      targetX = b.x - (pdx >= 0 ? 1 : -1) * 250;
+      targetY = 90 + Math.sin(b.frame * 0.12) * 25; // dodge upward
     }
 
-    let targetX, targetY;
-    if (b.swooping) {
-      b.swoopProg += enraged ? 0.018 : 0.012; // Slower swoop dive speed to allow reaction
-      const dive = Math.sin(Math.min(1, b.swoopProg) * Math.PI); // 0 -> 1 -> 0
-      targetX = b.homeX + (this.player.x - b.homeX) * dive * 0.85;
-      targetY = b.baseY + dive * 150;
-      if (b.swoopProg >= 1) {
-        b.swooping = false;
-        b.swoopTimer = enraged ? 150 : 240;
-      }
-    } else {
-      targetX = b.homeX + Math.sin(b.frame * 0.015) * 150;
-      targetY = b.baseY + Math.sin(b.frame * 0.05) * 22;
+    // Periodic committed dive-bomb (telegraphed window to hit it)
+    if (!b.swooping) {
+      b.swoopTimer--;
+      if (b.swoopTimer <= 0 && b.introT <= 0) { b.swooping = true; b.swoopProg = 0; }
     }
-    b.x += (targetX - b.x) * 0.08;
-    b.y += (targetY - b.y) * 0.10;
-    // Keep it ahead of Ellen, on the Mt. Fuji side of the wall
-    if (b.x < this.bossWallX + 30) b.x = this.bossWallX + 30;
+    if (b.swooping) {
+      b.swoopProg += enraged ? 0.03 : 0.022;
+      const dive = Math.sin(Math.min(1, b.swoopProg) * Math.PI); // 0 -> 1 -> 0
+      targetX = b.x + (this.player.x - b.x) * dive * 0.6;
+      targetY = b.baseY + dive * 150;
+      if (b.swoopProg >= 1) { b.swooping = false; b.swoopTimer = enraged ? 160 : 240; }
+    }
+
+    targetX = Math.max(arenaL, Math.min(arenaR, targetX));
+    targetY = Math.max(70, Math.min(330, targetY));
+
+    // High agility — very responsive (snappy dodges)
+    const agility = enraged ? 0.17 : 0.13;
+    b.x += (targetX - b.x) * agility;
+    b.y += (targetY - b.y) * agility;
     b.dir = (this.player.x < b.x) ? -1 : 1;
 
     // Ranged attack: aimed projectile spread
@@ -1913,6 +1936,22 @@ const Game = {
     this.banner = { timer: 360, text: '🌸 The Storm Guardian falls — the path to Mt. Fuji opens! 🗻' };
   },
 
+  // Nearest alive foe ahead of a returned projectile (for accurate whack-backs)
+  _nearestReturnTarget(p, dir) {
+    let best = null, bestD = Infinity;
+    this.enemies.forEach(e => {
+      if (!e.alive) return;
+      if ((e.x - p.x) * dir < -10) return; // must be ahead of the ball
+      const d = Math.hypot(e.x - p.x, e.y - p.y);
+      if (d < bestD) { bestD = d; best = { x: e.x, y: e.y }; }
+    });
+    if (this.boss && this.boss.alive) {
+      const d = Math.hypot(this.boss.x - p.x, this.boss.y - p.y);
+      if (d < bestD) { bestD = d; best = { x: this.boss.x, y: this.boss.y }; }
+    }
+    return best;
+  },
+
   damagePlayer() {
     if (this.player.invuln > 0 || this.player.isDead) return;
     this.player.health -= 1;
@@ -1968,12 +2007,6 @@ const Game = {
           this.banner = {
             timer: 240,
             text: '🎾 Tennis racket! Longer reach than your karate chop — swing at the monsters'
-          };
-        } else if (pk.kind === 'balls') {
-          this.player.hasBalls = true;
-          this.banner = {
-            timer: 240,
-            text: '🎾 Tennis balls! Your swing now serves an arcing ball — jump & serve at the clouds'
           };
         } else if (pk.kind === 'locket') {
           this.player.familyAttackActive = true;
@@ -2053,10 +2086,12 @@ const Game = {
       this.fujiRevealProgress = Math.min(1, this.fujiRevealProgress + 0.006);
     }
 
-    // Melee reach depends on the current attack (karate is shorter than racket)
-    const meleeReach = this.player.attackType === 'racket'
-      ? this.combat.swingReach
-      : this.combat.karateReach;
+    // Reach depends on the current attack. The racket reaches farther AND higher
+    // than the karate chop, so aerial foes that are tricky to clip with a chop
+    // (need a near-apex jump) become easy once the racket is in hand.
+    const usingRacket = this.player.attackType === 'racket';
+    const hReach = usingRacket ? this.combat.swingReach : this.combat.karateReach;
+    const vReach = usingRacket ? this.combat.swingVReach : this.combat.karateVReach;
 
     // --- Melee can also hit the boss when it dives low enough ---
     if (this.player.attackTimer > 0 &&
@@ -2064,25 +2099,61 @@ const Game = {
       const b = this.boss;
       const dir = this.player.dir;
       const dx = (b.x - this.player.x) * dir;
-      if (dx > -30 && dx < meleeReach + 40 && Math.abs(b.y - playerMidY) < 80) {
+      if (dx > -30 && dx < hReach + 40 && Math.abs(b.y - playerMidY) < vReach + 24) {
         b.lastSwingHit = this._swingId;
         this.hitBoss(1);
       }
     }
 
-    // --- Melee hit resolution (ground enemies only) ---
+    // --- Melee hit resolution (ground AND aerial enemies) ---
     // One swing damages a given enemy at most once (guarded by swing id), so a
-    // 2-hit monster survives a single swing.
+    // 2-hit monster survives a single swing. Vertical reach (vReach) is what
+    // makes karate vs racket matter against flying foes.
     if (this.player.attackTimer > 0) {
-      const reach = meleeReach;
       const dir = this.player.dir;
       this.enemies.forEach(e => {
-        if (!e.alive || e.type !== 'ground') return;
+        if (!e.alive) return;
         if (e.lastSwingHit === this._swingId) return;
         const dx = (e.x - this.player.x) * dir; // >0 = in front
-        if (dx > -12 && dx < reach && Math.abs(e.y - playerMidY) < 48) {
+        if (dx > -12 && dx < hReach && Math.abs(e.y - playerMidY) < vReach) {
           e.lastSwingHit = this._swingId;
           this.hitEnemy(e, 1);
+        }
+      });
+    }
+
+    // --- Racket projectile return (timing-based) ---
+    // Connect with an incoming shot during the racket's SWEET SPOT for an
+    // accurate return that homes toward the foe. Mistime the swing and the shot
+    // just clanks off at a bad angle and sails wide.
+    if (usingRacket && this.player.attackTimer > 0) {
+      const dir = this.player.dir;
+      const prog = 1 - this.player.attackTimer / (this.player.attackMax || this.combat.swingDuration);
+      const sweet = prog >= 0.15 && prog <= 0.55;
+      this.enemyProjectiles.forEach(p => {
+        if (!p.alive || p.friendly) return;
+        const dx = (p.x - this.player.x) * dir;
+        if (dx > -16 && dx < hReach + 6 && Math.abs(p.y - playerMidY) < vReach) {
+          p.friendly = true;
+          if (sweet) {
+            // Clean hit: rocket it toward the nearest foe ahead
+            const tgt = this._nearestReturnTarget(p, dir);
+            const speed = 9.5;
+            if (tgt) {
+              const a = Math.atan2(tgt.y - p.y, tgt.x - p.x);
+              p.vx = Math.cos(a) * speed;
+              p.vy = Math.sin(a) * speed;
+            } else {
+              p.vx = dir * speed; p.vy = -2;
+            }
+            AudioEngine.playSlashSFX();
+          } else {
+            // Mistimed: clanks off, scattered and weak — unlikely to connect
+            const speed = 3.5 + Math.random() * 2;
+            p.vx = dir * speed * (0.4 + Math.random() * 0.5);
+            p.vy = -2 - Math.random() * 4;
+            AudioEngine.playEnemyHurtSFX();
+          }
         }
       });
     }
@@ -2129,9 +2200,11 @@ const Game = {
       this.projectiles = this.projectiles.filter(p => p.alive);
     }
 
-    // --- Enemy projectiles (damage the player on hit) ---
+    // --- Enemy projectiles: damage the player, UNLESS the racket returned them
+    //     (friendly) — then they fly back and hurt the enemies/boss instead. ---
     this.enemyProjectiles.forEach(p => {
       if (!p.alive) return;
+      if (p.friendly) p.vy += this.combat.ballGravity * 0.5; // returned shots arc gently
       p.x += p.vx;
       p.y += p.vy;
       p.frame++;
@@ -2140,7 +2213,22 @@ const Game = {
         p.alive = false;
         return;
       }
-      if (Math.abs(p.x - this.player.x) < 20 && Math.abs(p.y - playerMidY) < 28) {
+      if (p.friendly) {
+        // Returned shot: strike enemies / boss, ignore the player
+        this.enemies.forEach(e => {
+          if (!e.alive || !p.alive) return;
+          if (Math.abs(e.x - p.x) < 22 && Math.abs(e.y - p.y) < 26) {
+            this.hitEnemy(e, 1);
+            p.alive = false;
+          }
+        });
+        if (p.alive && this.boss && this.boss.alive &&
+            Math.abs(this.boss.x - p.x) < this.boss.w * 0.45 &&
+            Math.abs(this.boss.y - p.y) < this.boss.h * 0.45) {
+          this.hitBoss(1);
+          p.alive = false;
+        }
+      } else if (Math.abs(p.x - this.player.x) < 20 && Math.abs(p.y - playerMidY) < 28) {
         p.alive = false;
         this.damagePlayer();
       }
@@ -2473,7 +2561,8 @@ const Game = {
     bgGrad.addColorStop(0, sky.top);
     bgGrad.addColorStop(1, sky.bottom);
     this.ctx.fillStyle = bgGrad;
-    this.ctx.fillRect(0, 0, this.width, this.height);
+    // Over-fill well beyond the canvas so the zoomed-out boss view has no gaps
+    this.ctx.fillRect(-this.width, -this.height, this.width * 3, this.height * 2);
 
     // Dynamic Stars depending on levels (Blaire idx 8 and RV idx 9 are the night milestones)
     const lvlIdx = this.getLevelIndexAtX(this.player.x);
@@ -2515,21 +2604,72 @@ const Game = {
       // The Mt. Fuji memory stays sealed until the Storm Guardian is defeated
       if (idx === this.levels.length - 1 && !this.bossDefeated) return;
 
-      const relativeX = lvl.x - this.camera.x;
-      // Float card in the sky
-      const py = 125;
+      // Optional per-level card offset (Mt. Fuji shifts its photos to the upper
+      // right so they don't cover the mountain).
+      const relativeX = lvl.x - this.camera.x + (lvl.cardDX || 0);
+      const py = 125 + (lvl.cardDY || 0);
 
       const dist = Math.abs(this.player.x - lvl.x);
-      
+
       // Calculate opacity: starts fading in 420px away
       let alpha = 0;
       if (dist < 420) {
         alpha = 1 - (dist / 420);
       }
-      
+
       if (alpha > 0) {
         Assets.drawPolaroid(this.ctx, relativeX, py, lvl, alpha, Date.now());
       }
+    });
+
+    // Progressive control hints in the sky near the start (walk -> jump -> chop)
+    this.drawTutorialHints();
+  },
+
+  // Floating control hints that fade in/out as Ellen walks past them.
+  drawTutorialHints() {
+    if (!this.tutorialHints) return;
+    if (this.player.x > 1450) return; // all hints are near the start; skip later
+
+    const ctx = this.ctx;
+    const range = 230; // px window over which a hint fades in/out
+    this.tutorialHints.forEach(hint => {
+      const dist = Math.abs(this.player.x - hint.x);
+      if (dist >= range) return;
+      const alpha = 1 - dist / range;
+      const sx = hint.x - this.camera.x;
+      if (sx < -160 || sx > this.width + 160) return;
+      const y = 96;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+
+      // Soft rounded backdrop sized to the title
+      ctx.font = '700 20px "Fredoka", "Outfit", sans-serif';
+      const tw = ctx.measureText(hint.title).width;
+      const w = Math.max(180, tw + 44), h = hint.sub ? 56 : 40;
+      const bx = sx - w / 2, by = y - 26, r = 14;
+      ctx.fillStyle = 'rgba(20, 24, 40, 0.5)';
+      ctx.beginPath();
+      ctx.moveTo(bx + r, by);
+      ctx.arcTo(bx + w, by, bx + w, by + h, r);
+      ctx.arcTo(bx + w, by + h, bx, by + h, r);
+      ctx.arcTo(bx, by + h, bx, by, r);
+      ctx.arcTo(bx, by, bx + w, by, r);
+      ctx.closePath();
+      ctx.fill();
+
+      // Title
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(hint.title, sx, y - 2);
+      // Sub-hint
+      if (hint.sub) {
+        ctx.font = '500 12px "Outfit", sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.fillText(hint.sub, sx, y + 18);
+      }
+      ctx.restore();
     });
   },
 
@@ -2634,14 +2774,14 @@ const Game = {
   drawForeground() {
     const camX = this.camera.x;
 
-    // Draw Ground Path
+    // Draw Ground Path (over-filled wide + down so the zoomed-out view has no gaps)
     const currentGroundColor = this.levels[this.getLevelIndexAtX(this.player.x)].groundColor || "#47752b";
     this.ctx.fillStyle = currentGroundColor;
-    this.ctx.fillRect(0, this.height - 80, this.width, 80);
-    
+    this.ctx.fillRect(-this.width, this.height - 80, this.width * 3, 240);
+
     // Ground detail line
     this.ctx.fillStyle = 'rgba(0,0,0,0.08)';
-    this.ctx.fillRect(0, this.height - 80, this.width, 6);
+    this.ctx.fillRect(-this.width, this.height - 80, this.width * 3, 6);
 
     // Draw obstacles (hurdles)
     this.hurdles.forEach(hurdle => {
@@ -2712,11 +2852,15 @@ const Game = {
       }
     });
 
-    // Draw enemy projectiles
+    // Draw enemy projectiles (returned ones render as her glowing tennis ball)
     this.enemyProjectiles.forEach(p => {
       const rx = p.x - camX;
       if (rx > -30 && rx < this.width + 30) {
-        Assets.drawEnemyBullet(this.ctx, rx, p.y, p.kind, p.frame);
+        if (p.friendly) {
+          Assets.drawBullet(this.ctx, rx, p.y, Math.sign(p.vx) || 1, (p.frame || 0) * 0.3);
+        } else {
+          Assets.drawEnemyBullet(this.ctx, rx, p.y, p.kind, p.frame);
+        }
       }
     });
 
@@ -2795,9 +2939,7 @@ const Game = {
         Assets.drawSpeechBubble(this.ctx, pX + this.player.dir * 10, this.player.y - 80, this.shout.text);
       }
     }
-
-    // HUD overlays rendered on canvas
-    this.drawHUD();
+    // HUD is drawn by the main loop (outside the zoom transform), not here.
   },
 
   // A bank of storm clouds shrouding Mt. Fuji. `alpha` fades 1 -> 0 as the
@@ -2957,9 +3099,9 @@ const Game = {
 
     // --- Weapon badge ---
     {
-      let wName = this.player.hasBalls ? 'Racket + Balls' : 'Racket';
+      let wName = 'Racket';
       let wIcon = '🎾';
-      let wWidth = this.player.hasBalls ? 128 : 86;
+      let wWidth = 86;
       if (!this.player.weapon) {
         // Bare-hand karate (the starting move)
         wName = 'Karate';
@@ -3138,9 +3280,20 @@ const Game = {
       this.updatePhysics();
     }
 
-    // Rendering pipeline
+    // Rendering pipeline. The world is drawn under an optional zoom-out transform
+    // (boss arena); the HUD is drawn afterwards so it stays full-size & crisp.
+    const z = this.viewZoom || 1;
+    const zooming = Math.abs(z - 1) > 0.001;
+    if (zooming) {
+      this.ctx.save();
+      this.ctx.translate(this.width / 2, this.height); // anchor zoom at bottom-center
+      this.ctx.scale(z, z);
+      this.ctx.translate(-this.width / 2, -this.height);
+    }
     this.drawBackground();
     this.drawForeground();
+    if (zooming) this.ctx.restore();
+    this.drawHUD();
 
     // If game ended, run fireworks
     if (this.currentLevelIndex === this.levels.length - 1 && this.isPaused) {
