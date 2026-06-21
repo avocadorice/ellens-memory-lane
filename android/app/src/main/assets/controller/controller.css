@@ -1,0 +1,71 @@
+:root {
+  --peach: #ffd8c2;
+  --peach-deep: #ffb38f;
+  --ink: #3a2417;
+  --hair: #4a3728;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+  background: radial-gradient(120% 120% at 50% 0%, #ffe9db 0%, #ffc6a3 100%);
+  user-select: none; -webkit-user-select: none; touch-action: none;
+}
+
+.status {
+  position: fixed; top: 0; left: 0; right: 0;
+  text-align: center; font-weight: 700; font-size: 14px;
+  padding: 8px; letter-spacing: .3px; z-index: 10;
+}
+.status.connecting { background: #ffe0a3; color: #7a5200; }
+.status.connected  { background: #b8f0c0; color: #1d6b2c; }
+.status.lost       { background: #ffc2c2; color: #8a1f1f; }
+
+.pad {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 4vw; gap: 3vw;
+}
+
+.dpad, .actions { display: flex; gap: 4vw; }
+.dpad { flex-direction: row; }
+.actions { flex-direction: column; }
+
+.btn {
+  border: none; color: #fff; font-weight: 800;
+  border-radius: 28px;
+  box-shadow: 0 6px 0 rgba(0,0,0,.18), inset 0 2px 6px rgba(255,255,255,.35);
+  transition: transform .04s ease, box-shadow .04s ease, filter .04s ease;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn.active {
+  transform: translateY(4px) scale(.97);
+  box-shadow: 0 2px 0 rgba(0,0,0,.18), 0 0 22px 4px rgba(255,255,255,.45), inset 0 2px 6px rgba(255,255,255,.4);
+  filter: brightness(1.08);
+}
+
+.dir {
+  width: 26vw; height: 26vw; max-width: 170px; max-height: 170px;
+  font-size: 12vw;
+  background: linear-gradient(160deg, #8aa0c7, #3d5a80);
+}
+
+.act {
+  width: 32vw; height: 18vh; max-width: 200px; max-height: 150px;
+  font-size: 5.5vw; letter-spacing: 1px;
+}
+.act.jump { background: linear-gradient(160deg, #ffd27a, #f4845f); }
+.act.chop { background: linear-gradient(160deg, #ff9aa8, #e0556b); }
+
+.hint {
+  position: fixed; bottom: 8px; left: 0; right: 0;
+  text-align: center; font-size: 12px; opacity: .65; padding: 0 12px;
+}
+
+/* On tall portrait phones, give the action column a bit more height */
+@media (orientation: portrait) {
+  .act { height: 14vh; }
+}

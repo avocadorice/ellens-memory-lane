@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2a1c14">
+  <title>Ellen's Memory Lane — Controller</title>
+  <link rel="stylesheet" href="controller.css">
+</head>
+<body>
+  <div id="status" class="status connecting">Connecting…</div>
+
+  <div class="pad">
+    <!-- Left thumb: movement -->
+    <div class="dpad">
+      <button class="btn dir" data-key="left" aria-label="Left">◀</button>
+      <button class="btn dir" data-key="right" aria-label="Right">▶</button>
+    </div>
+
+    <!-- Right thumb: actions -->
+    <div class="actions">
+      <button class="btn act jump" data-key="jump" aria-label="Jump">JUMP</button>
+      <button class="btn act chop" data-key="chop" aria-label="Chop">CHOP</button>
+    </div>
+  </div>
+
+  <div class="hint">Hold ◀ ▶ to move • JUMP to hop &amp; bounce • CHOP to karate / swing</div>
+
+  <script src="controller.js"></script>
+</body>
+</html>

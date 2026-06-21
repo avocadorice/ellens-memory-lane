@@ -11,8 +11,8 @@ android {
         applicationId "com.ellensmemorylane.tv"
         minSdk 21          // Android 5.0 — covers all Android TV / Google TV devices
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 5
+        versionName "1.4"
     }
 
     buildTypes {
@@ -32,5 +32,8 @@ android {
 }
 
 dependencies {
-    // Intentionally minimal — a plain WebView wrapper needs no extra libraries.
+    // Phone-as-controller: a local WebSocket server relays touch inputs from the
+    // paired phone, and ZXing renders the pairing QR code.
+    implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+    implementation 'com.google.zxing:core:3.5.3'
 }

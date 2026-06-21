@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>html,body{margin:0;padding:0;overflow:hidden}canvas{display:block}</style>
+</head>
+<body>
+<!-- Rendered at 2x (640x360) for crisp downscaling; banner aspect is 16:9 -->
+<canvas id="c" width="640" height="360"></canvas>
+<script src="../assets.js"></script>
+<script>
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+
+  // Background: warm peach gradient
+  const g = ctx.createLinearGradient(0, 0, 0, 360);
+  g.addColorStop(0, '#ffe9db');
+  g.addColorStop(1, '#ffc6a3');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 640, 360);
+
+  // Ellen's head, left
+  const scale = 8;
+  const headLocalY = -58;
+  Assets._drawEllenDirect(ctx, 150, 150 - headLocalY * scale, 'casual', 0, 1, scale, false);
+
+  // Title text, right side
+  ctx.fillStyle = '#4a3728';
+  ctx.textBaseline = 'middle';
+  ctx.font = '700 50px "Trebuchet MS", "Segoe UI", system-ui, sans-serif';
+  ctx.fillText("Ellen's", 285, 148);
+  ctx.fillText('Memory Lane', 285, 208);
+
+  document.title = 'BANNER_READY';
+</script>
+</body>
+</html>
