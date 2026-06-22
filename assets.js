@@ -2718,6 +2718,41 @@ const Assets = {
   },
 
   // Barney's Volleyball
+  // Classic black-and-white soccer ball (used by the pre-boss family soccer
+  // gauntlet — both the dribbled ball and the kicked projectile).
+  drawSoccerBall(ctx, x, y, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(spin || 0);
+    const r = 9;
+    // white ball + outline
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // central black pentagon
+    ctx.fillStyle = '#1f2937';
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = i * (Math.PI * 2 / 5) - Math.PI / 2;
+      const px = Math.cos(a) * r * 0.42, py = Math.sin(a) * r * 0.42;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // ring of small black patches
+    for (let i = 0; i < 5; i++) {
+      const a = i * (Math.PI * 2 / 5) - Math.PI / 2 + Math.PI / 5;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r * 0.74, Math.sin(a) * r * 0.74, r * 0.17, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
   drawVolleyball(ctx, x, y, dir, spin) {
     ctx.save();
     ctx.translate(x, y);

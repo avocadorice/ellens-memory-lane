@@ -500,8 +500,9 @@ const Game = {
   boss: null,
   bossActive: false,    // fight in progress (invisible wall up)
   bossDefeated: false,  // beaten → Fuji photos reveal + path opens
-  bossArenaStart: 13320, // x where the fight begins (after RV camping, before Fuji)
-  bossWallX: 13900,      // Ellen can roam the full arena up to here (just shy of Fuji)
+  bossArenaStart: 14820, // x where the fight begins (after the soccer gauntlet, before Fuji)
+  bossWallX: 15400,      // Ellen can roam the full arena up to here (just shy of Fuji)
+  soccerStart: 13450,    // x where the family soccer gauntlet begins (after RV camping)
   fujiRevealProgress: 0, // 0 = Mt. Fuji shrouded in storm clouds, 1 = fully revealed
   viewZoom: 1,           // <1 zooms the camera out (boss arena gets a wide cinematic view)
 
@@ -638,8 +639,8 @@ const Game = {
     // Reset player combat loadout
     this.player.weapon = null;
     this.player.hasBalls = false;
-    this.player.familyAttackActive = false;
-    this.familyAttackIndex = 0;
+    this.kickerIndex = 0;        // whose turn to kick in the soccer gauntlet
+    this.soccerBannerShown = false;
     this.hopTimers = { husband: 0, kid1: 0, kid2: 0, dog: 0 };
     this.player.health = this.player.maxHealth;
     this.player.attackTimer = 0;
@@ -728,17 +729,14 @@ const Game = {
     this.racketX = racketX;
     this.ballsX = ballsX;
 
-    // Pickups: tennis racket, tennis balls, and family locket
-    const locketX = this.bossArenaStart - 240;
-    this.locketX = locketX;
+    // Pickups: tennis racket + tennis balls
     this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
-    this.pickups.push({ x: locketX, y: groundY, kind: 'locket', collected: false, frame: 0 });
 
     const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
-    const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150 || Math.abs(x - locketX) < 150;
+    const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150;
 
     // Don't let a random hurdle (e.g. the camping campfire art) sit on top of a
-    // pickup like the Locket of Unity — clear any that overlap a pickup spot.
+    // pickup — clear any that overlap a pickup spot.
     this.hurdles = this.hurdles.filter(h => !nearPickup(h.x));
 
     const groundKinds = ['slime_green', 'slime_purple', 'slime_teal'];
@@ -834,6 +832,19 @@ const Game = {
         }
       }
     });
+
+    // Soccer gauntlet: a line of ground foes to boot soccer balls at on the
+    // run-up to the boss. (Added after the relocation pass so they stay put.)
+    for (let sx = this.soccerStart + 240; sx < this.bossArenaStart - 220; sx += 300) {
+      this.enemies.push({
+        type: 'ground', kind: groundKinds[gi % groundKinds.length],
+        x: sx, homeX: sx, y: groundY - 14, baseY: groundY - 14,
+        alive: true, dir: -1, range: 38, hitFlash: 0,
+        frame: (gi * 9) % 60, section: this.getLevelIndexAtX(sx), high: false, heart: null,
+        tier: 1, hp: 1, maxHp: 1, lastSwingHit: -1
+      });
+      gi++;
+    }
 
     // Trampoline-gated bonus hearts floating high above the path
     const highHeartXs = [];
@@ -936,11 +947,6 @@ const Game = {
     if (this.player.x >= (this.racketX || 3600)) {
       this.player.weapon = 'racket';
       this.pickups.forEach(p => { if (p.kind === 'racket') p.collected = true; });
-    }
-    // Family locket (all 5 join the attack) — grant + consume only past its spot
-    if (this.locketX && this.player.x >= this.locketX) {
-      this.player.familyAttackActive = true;
-      this.pickups.forEach(p => { if (p.kind === 'locket') p.collected = true; });
     }
 
     // Chime BGM effect
@@ -1647,7 +1653,7 @@ const Game = {
     // During the boss fight the camera locks to frame the whole arena + mountain
     // and zooms out; otherwise it follows the player.
     const inBossFight = this.bossActive && !this.bossDefeated;
-    const targetCamX = inBossFight ? 13150 : (this.player.x - this.width / 3);
+    const targetCamX = inBossFight ? (this.bossArenaStart - 170) : (this.player.x - this.width / 3);
     this.camera.x += (targetCamX - this.camera.x) * 0.08;
     // Lock camera boundaries
     if (this.camera.x < 0) this.camera.x = 0;
@@ -1714,6 +1720,15 @@ const Game = {
       }
     });
 
+    // Soccer gauntlet intro banner (once, on entry)
+    if (!this.soccerBannerShown && this.inSoccerZone()) {
+      this.soccerBannerShown = true;
+      this.banner = {
+        timer: 320,
+        text: '⚽ Family soccer! The family takes turns — kick the ball at the foes!'
+      };
+    }
+
     // Combat systems (pickups, enemies, projectiles, trampolines, damage)
     this.updateCombat();
   },
@@ -1723,7 +1738,14 @@ const Game = {
   // ============================================================
   attack() {
     if (!this.isRunning || this.isPaused || this.player.isDead) return;
-    if (this.player.attackTimer > 0) return;    // mid-swing/chop
+    if (this.player.attackTimer > 0) return;    // mid-swing/chop/kick
+
+    // Soccer gauntlet (the pre-boss stretch): ranged offense becomes a rotating
+    // family soccer-ball kick instead of melee.
+    if (this.inSoccerZone()) {
+      this.kickSoccerBall();
+      return;
+    }
 
     // Karate from the start (short reach); the racket extends reach once grabbed.
     const usingRacket = this.player.weapon === 'racket';
@@ -1737,61 +1759,44 @@ const Game = {
       // Karate chop: Ellen shouts "Aya!"
       this.shout = { text: 'Aya!', timer: this.player.attackMax + 10 };
     }
-
-    // Late-game family co-op attack (from the Locket of Unity). The standalone
-    // tennis-ball serve was removed — ranged offense now comes from whacking
-    // enemy projectiles back at them with the racket.
-    if (this.player.familyAttackActive) {
-      this.fireFamilyAttack();
-    }
   },
 
-  fireFamilyAttack() {
-    if (this.familyAttackIndex === undefined) {
-      this.familyAttackIndex = 0;
-    }
-    const currentIdx = this.familyAttackIndex;
-    this.familyAttackIndex = (this.familyAttackIndex + 1) % 5;
+  // The soccer gauntlet runs from soccerStart up to the boss arena.
+  inSoccerZone() {
+    return !this.bossActive &&
+      this.player.x >= this.soccerStart && this.player.x < this.bossArenaStart;
+  },
 
+  // The order the family takes turns kicking. In this late zone all five are
+  // present (Ellen, Barney, Preston=kid1, Blaire=kid2, Mochi=dog).
+  SOCCER_ORDER: ['player', 'husband', 'kid1', 'kid2', 'dog'],
+
+  // Family soccer: the front-of-line kicker boots a soccer ball, then rotates to
+  // the back so the next family member is up. kickerIndex always points at whose
+  // turn is NEXT (so the dribble ball is drawn at their feet — see drawForeground).
+  kickSoccerBall() {
+    const order = this.SOCCER_ORDER;
+    const idx = (this.kickerIndex || 0) % order.length;
+    this.kickerIndex = (idx + 1) % order.length;
+    const who = order[idx];
     const dir = this.player.dir;
-    let spawnX = this.player.x;
-    let spawnY = this.player.y - 36;
-    let pType = 'tennis_ball';
 
-    if (currentIdx === 0) {
-      // Ellen (player)
-      spawnX = this.player.x + dir * 20;
-      spawnY = this.player.y - 36;
-      pType = 'tennis_ball';
-      AudioEngine.playShootSFX();
+    // Brief kick animation + cooldown via attackTimer.
+    this.player.attackType = 'karate';
+    this.player.attackMax = this.combat.karateDuration;
+    this.player.attackTimer = this.player.attackMax;
+
+    let spawnX = this.player.x + dir * 22;
+    let spawnY = this.player.y - 18;
+    if (who === 'player') {
+      this.shout = { text: 'Hup!', timer: this.player.attackMax + 8 };
     } else {
-      let compType = '';
-      if (currentIdx === 1) {
-        compType = 'husband';
-        pType = 'volleyball';
-      } else if (currentIdx === 2) {
-        compType = 'kid1';
-        pType = 'nunchucks';
-      } else if (currentIdx === 3) {
-        compType = 'kid2';
-        pType = Math.random() < 0.5 ? 'apple' : 'avocado';
-      } else if (currentIdx === 4) {
-        compType = 'dog';
-        pType = 'dog_treat';
-      }
-
-      const comp = this.companions.find(c => c.type === compType);
+      const comp = this.companions.find(c => c.type === who);
       if (comp) {
-        spawnX = comp.x;
-        spawnY = comp.y - 20;
-        if (this.hopTimers) {
-          this.hopTimers[compType] = 15;
-        }
-      } else {
-        spawnX = this.player.x + dir * 20;
-        spawnY = this.player.y - 36;
+        spawnX = comp.x + dir * 14;
+        spawnY = comp.y - 18;
+        if (this.hopTimers) this.hopTimers[who] = 15; // little kick hop
       }
-      AudioEngine.playShootSFX();
     }
 
     this.projectiles.push({
@@ -1803,8 +1808,9 @@ const Game = {
       bounced: false,
       dir,
       alive: true,
-      type: pType
+      type: 'soccer_ball'
     });
+    AudioEngine.playShootSFX();
   },
 
   // Apply damage to an enemy. Tougher (2-hit) monsters flash when hurt but
@@ -1842,7 +1848,7 @@ const Game = {
   startBossFight() {
     this.bossActive = true;
     this.boss = {
-      homeX: 13950, x: 13950,
+      homeX: 15450, x: 15450,
       baseY: 170, y: 90,
       w: 120, h: 120,
       hp: 12, maxHp: 12,
@@ -2042,13 +2048,6 @@ const Game = {
           this.banner = {
             timer: 240,
             text: '🎾 Tennis racket! Longer reach than your karate chop — swing at the monsters'
-          };
-        } else if (pk.kind === 'locket') {
-          this.player.familyAttackActive = true;
-          AudioEngine.playWinSFX();
-          this.banner = {
-            timer: 300,
-            text: '💖 Locket of Unity! The family joins the fight with custom alternate attacks! 👨‍👩‍👧‍👦'
           };
         }
       }
@@ -2995,7 +2994,9 @@ const Game = {
     this.projectiles.forEach(p => {
       const rx = p.x - camX;
       if (rx > -30 && rx < this.width + 30) {
-        if (p.type === 'volleyball') {
+        if (p.type === 'soccer_ball') {
+          Assets.drawSoccerBall(this.ctx, rx, p.y, p.spin);
+        } else if (p.type === 'volleyball') {
           Assets.drawVolleyball(this.ctx, rx, p.y, p.dir, p.spin);
         } else if (p.type === 'nunchucks') {
           Assets.drawNunchucks(this.ctx, rx, p.y, p.dir, p.spin);
@@ -3098,7 +3099,38 @@ const Game = {
         Assets.drawSpeechBubble(this.ctx, pX + this.player.dir * 10, this.player.y - 80, this.shout.text);
       }
     }
+
+    // Soccer dribble: a ball at the feet of whoever kicks next, so it's clear
+    // whose turn it is as the "ball" passes down the rotating line.
+    if (this.inSoccerZone()) this.drawSoccerDribble(camX);
+
     // HUD is drawn by the main loop (outside the zoom transform), not here.
+  },
+
+  drawSoccerDribble(camX) {
+    const order = this.SOCCER_ORDER;
+    const who = order[(this.kickerIndex || 0) % order.length];
+    const groundY = this.height - 80;
+    let fx = this.player.x, fy = this.player.y, name = 'Ellen';
+    if (who !== 'player') {
+      const comp = this.companions.find(c => c.type === who);
+      if (comp) { fx = comp.x; fy = comp.y; }
+      name = { husband: 'Barney', kid1: 'Preston', kid2: 'Blaire', dog: 'Mochi' }[who] || '';
+    }
+    const dir = this.player.dir;
+    const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
+    Assets.drawSoccerBall(this.ctx, fx - camX + dir * 16, (fy || groundY) - 6 - bob, Date.now() * 0.02);
+
+    // Little marker above the current kicker so the rotation is legible.
+    const sx = fx - camX;
+    this.ctx.save();
+    this.ctx.globalAlpha = 0.85;
+    this.ctx.textAlign = 'center';
+    this.ctx.font = '700 11px Outfit';
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.fillText(`⚽ ${name}`, sx, (fy || groundY) - 96);
+    this.ctx.fillText('▾', sx, (fy || groundY) - 86);
+    this.ctx.restore();
   },
 
   // A bank of storm clouds shrouding Mt. Fuji. `alpha` fades 1 -> 0 as the
@@ -3267,10 +3299,10 @@ const Game = {
         wIcon = '🥋';
         wWidth = 86;
       }
-      if (this.player.familyAttackActive) {
-        wName = 'Family Unity 👨‍👩‍👧‍👦';
-        wIcon = '💖';
-        wWidth = 145;
+      if (this.inSoccerZone()) {
+        wName = 'Family Soccer';
+        wIcon = '⚽';
+        wWidth = 120;
       }
       this.ctx.fillStyle = 'rgba(0,0,0,0.4)';
       this.ctx.fillRect(hbX - 6, hbY + 14, wWidth, 22);
