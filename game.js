@@ -1564,7 +1564,13 @@ const Game = {
     if (this.player.isGrounded) {
       this.lastWalkDir = walkLeft ? -1 : (walkRight ? 1 : 0);
       this.airJumpDir = 0;
-    } else if (!walkLeft && !walkRight && this.airJumpDir) {
+    } else if (walkLeft || walkRight) {
+      // Steering mid-air updates the carried heading, so when you release the
+      // key she keeps going the way you were LAST pushing — not the original
+      // takeoff direction (which used to swing her back once all keys released).
+      this.airJumpDir = walkLeft ? -1 : 1;
+    } else if (this.airJumpDir) {
+      // Coasting with no keys held: carry the last heading through the arc.
       if (this.airJumpDir > 0) walkRight = 1; else walkLeft = 1;
     }
 
