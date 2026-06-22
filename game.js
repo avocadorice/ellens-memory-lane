@@ -734,12 +734,7 @@ const Game = {
     this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
     this.pickups.push({ x: locketX, y: groundY, kind: 'locket', collected: false, frame: 0 });
 
-    // Keep enemies out of each memory's full story-reading span (+ a margin) so
-    // fighting and story text never share the screen.
-    const nearMilestone = (x) => this.levels.some(l => {
-      const z = this.storyZone(l);
-      return x >= z.start - 70 && x <= z.end + 70;
-    });
+    const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
     const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150 || Math.abs(x - locketX) < 150;
 
     // Don't let a random hurdle (e.g. the camping campfire art) sit on top of a
@@ -818,6 +813,27 @@ const Game = {
       }
       fx += 760 - 280 * progress(fx); // ~620 -> ~480 late
     }
+
+    // Memories are now read by walking through them, so any enemy that landed
+    // inside a memory's story-reading span gets nudged forward into the gap that
+    // follows it — same number of foes, just never on screen while she's reading.
+    const storyZones = this.levels.map(l => this.storyZone(l));
+    const packed = {};
+    this.enemies.forEach(e => {
+      for (let zi = 0; zi < storyZones.length; zi++) {
+        const z = storyZones[zi];
+        if (e.x > z.start - 40 && e.x < z.end + 40) {
+          const gapStart = z.end + 55;
+          const gapEnd = (zi + 1 < storyZones.length ? storyZones[zi + 1].start : trackEnd) - 55;
+          const n = packed[zi] || 0;
+          const nx = Math.min(gapStart + n * 95, Math.max(gapStart, gapEnd));
+          packed[zi] = n + 1;
+          e.x = nx;
+          e.homeX = nx;
+          break;
+        }
+      }
+    });
 
     // Trampoline-gated bonus hearts floating high above the path
     const highHeartXs = [];
@@ -2716,7 +2732,9 @@ const Game = {
     const bodyLines = this.wrapText(ctx, active.dialogue[idx], boxW - 56);
     const lineH = 25, headerH = 22, gap = 10, padTop = 16, padBot = 20, dotsH = 14;
     const boxH = padTop + headerH + gap + bodyLines.length * lineH + dotsH + padBot;
-    const bx = cx - boxW / 2, by = 56, r = 18;
+    // Anchored near the bottom (subtitle-style) so it never covers the floating
+    // polaroid album, which lives up top.
+    const bx = cx - boxW / 2, by = this.height - boxH - 40, r = 18;
 
     // Rounded translucent backdrop
     ctx.fillStyle = 'rgba(20, 24, 40, 0.62)';
@@ -2756,7 +2774,7 @@ const Game = {
       ctx.globalAlpha = alpha * 0.7;
       ctx.font = '500 11px "Outfit", sans-serif';
       ctx.fillStyle = '#ffffff';
-      ctx.fillText('keep walking to read on  →', cx, by + boxH + 15);
+      ctx.fillText('keep walking to read on  →', cx, by - 9);
     }
 
     ctx.restore();
