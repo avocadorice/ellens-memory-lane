@@ -2736,8 +2736,8 @@ const Game = {
 
     ctx.font = '600 19px "Outfit", sans-serif';
     const bodyLines = this.wrapText(ctx, active.dialogue[idx], boxW - 56);
-    const lineH = 25, headerH = 22, gap = 10, padTop = 16, padBot = 20, dotsH = 14;
-    const boxH = padTop + headerH + gap + bodyLines.length * lineH + dotsH + padBot;
+    const lineH = 25, padTop = 18, padBot = 20, dotsH = 14;
+    const boxH = padTop + bodyLines.length * lineH + dotsH + padBot;
     // Float the card in the open middle band — below the polaroid album (cardH
     // 145, centred ~y125, so its base is ~y205) and above the characters/ground
     // near the bottom — so it overlaps neither.
@@ -2758,14 +2758,8 @@ const Game = {
     ctx.closePath();
     ctx.fill();
 
-    // Header: memory name • year
-    let y = by + padTop + 8;
-    ctx.font = '700 15px "Fredoka", "Outfit", sans-serif';
-    ctx.fillStyle = '#ffd1dc';
-    ctx.fillText(`${active.name}  •  ${active.year}`, cx, y);
-    y += headerH + gap;
-
-    // Body line
+    // Body line(s) — no name/year header (it's already on the polaroid + HUD)
+    let y = by + padTop + 4;
     ctx.font = '600 19px "Outfit", sans-serif';
     ctx.fillStyle = '#ffffff';
     for (const bl of bodyLines) { ctx.fillText(bl, cx, y); y += lineH; }
