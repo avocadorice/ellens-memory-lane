@@ -3351,6 +3351,40 @@ const Assets = {
   },
 
   // Projectile fired BY an enemy at Ellen. kind tints it to match the foe.
+  // Fast forked lightning bolt (the Storm Guardian's phase-2 attack), drawn
+  // along its travel angle with a flickering electric glow.
+  drawLightningBolt(ctx, x, y, angle, frame) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    const flick = 0.7 + 0.3 * Math.abs(Math.sin((frame || 0) * 0.9));
+    const pts = [[-17, 0], [-7, -7], [-1, 3], [7, -6], [13, 4], [19, -1]];
+    const trace = () => {
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+      ctx.stroke();
+    };
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // outer glow
+    ctx.shadowColor = 'rgba(150,205,255,1)';
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = `rgba(255,240,140,${flick})`;
+    ctx.lineWidth = 5;
+    trace();
+    // bright white core
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    trace();
+    // sparking tip
+    ctx.fillStyle = `rgba(150,215,255,${flick})`;
+    ctx.beginPath();
+    ctx.arc(19, -1, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  },
+
   drawEnemyBullet(ctx, x, y, kind, frame) {
     ctx.save();
     ctx.translate(x, y);

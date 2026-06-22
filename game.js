@@ -1856,6 +1856,7 @@ const Game = {
       hitFlash: 0, lastSwingHit: -1,
       shootTimer: 110,
       swoopTimer: 240, swooping: false, swoopProg: 0,
+      phase2: false, // flips at 50% HP → Storm Fury (fast + lightning)
       introT: 100 // brief grace before it starts attacking
     };
     this.banner = { timer: 320, text: '⚡ The Storm Guardian blocks the path to Mt. Fuji — defeat it!' };
@@ -1869,24 +1870,35 @@ const Game = {
     if (b.introT > 0) b.introT--;
     if (b.hitFlash > 0) b.hitFlash--;
 
-    // Gets faster + meaner once it's below half health
-    const enraged = b.hp <= b.maxHp / 2;
+    // Two distinct phases, switching at 50% HP:
+    //  Phase 1 (>50%): a slow, readable glide — gentle sweep + bob, with the
+    //    occasional committed swoop as the main window to hit it. No panic
+    //    dodging (the constant bolt-away is what made it feel erratic before).
+    //  Phase 2 (<=50%): "Storm Fury" — fast, dynamic and evasive. Quick sweeps,
+    //    active dodging when Ellen is close or swinging, frequent swoops, and
+    //    fast lightning bolts.
+    const phase2 = b.hp <= b.maxHp / 2;
+    if (phase2 && !b.phase2) {
+      b.phase2 = true;        // just crossed the threshold
+      b.shootTimer = 28;      // a quick first bolt to announce the shift
+      this.banner = { timer: 240, text: '⚡ STORM FURY! The Guardian crackles with lightning — dodge!' };
+    }
 
     // Arena bounds the boss zips across (full width, in front of the mountain)
-    const arenaL = this.bossArenaStart + 30;   // ~13350
-    const arenaR = this.bossWallX + 260;        // ~14160
+    const arenaL = this.bossArenaStart + 30;
+    const arenaR = this.bossWallX + 260;
 
-    // Default: brisk full-width left<->right sweep + a vertical weave that uses
-    // the upper sky.
-    const sweepSpeed = enraged ? 0.020 : 0.014;
+    // Sweep + vertical weave (calmer in phase 1, snappier in phase 2)
+    const sweepSpeed = phase2 ? 0.026 : 0.0095;
     let targetX = arenaL + (0.5 + 0.5 * Math.sin(b.frame * sweepSpeed)) * (arenaR - arenaL);
-    let targetY = b.baseY + Math.sin(b.frame * 0.05) * 95; // ~75..265
+    let targetY = b.baseY + Math.sin(b.frame * (phase2 ? 0.075 : 0.035)) * (phase2 ? 82 : 68);
 
-    // Evasion: if Ellen is near or mid-swing, bolt the other way and climb high
-    const pdx = this.player.x - b.x;
-    if (b.introT <= 0 && (this.player.attackTimer > 0 || Math.abs(pdx) < 175)) {
-      targetX = b.x - (pdx >= 0 ? 1 : -1) * 250;
-      targetY = 90 + Math.sin(b.frame * 0.12) * 25; // dodge upward
+    // Active dodging is PHASE 2 ONLY — bolt away + climb when Ellen is close or
+    // mid-swing. (Phase 1 stays calm and trackable.)
+    if (phase2 && b.introT <= 0 && (this.player.attackTimer > 0 || Math.abs(this.player.x - b.x) < 190)) {
+      const pdx = this.player.x - b.x;
+      targetX = b.x - (pdx >= 0 ? 1 : -1) * 270;
+      targetY = 95 + Math.sin(b.frame * 0.14) * 28;
     }
 
     // Periodic committed dive-bomb (telegraphed window to hit it)
@@ -1895,28 +1907,34 @@ const Game = {
       if (b.swoopTimer <= 0 && b.introT <= 0) { b.swooping = true; b.swoopProg = 0; }
     }
     if (b.swooping) {
-      b.swoopProg += enraged ? 0.03 : 0.022;
+      b.swoopProg += phase2 ? 0.034 : 0.020;
       const dive = Math.sin(Math.min(1, b.swoopProg) * Math.PI); // 0 -> 1 -> 0
       targetX = b.x + (this.player.x - b.x) * dive * 0.6;
       targetY = b.baseY + dive * 150;
-      if (b.swoopProg >= 1) { b.swooping = false; b.swoopTimer = enraged ? 160 : 240; }
+      if (b.swoopProg >= 1) { b.swooping = false; b.swoopTimer = phase2 ? 150 : 300; }
     }
 
     targetX = Math.max(arenaL, Math.min(arenaR, targetX));
     targetY = Math.max(70, Math.min(330, targetY));
 
-    // High agility — very responsive (snappy dodges)
-    const agility = enraged ? 0.17 : 0.13;
+    // Phase 1 glides smoothly (low agility); phase 2 snaps around — dynamic and
+    // hard to track.
+    const agility = phase2 ? 0.17 : 0.06;
     b.x += (targetX - b.x) * agility;
     b.y += (targetY - b.y) * agility;
     b.dir = (this.player.x < b.x) ? -1 : 1;
 
-    // Ranged attack: aimed projectile spread
+    // Ranged attack: a slow aimed spread in phase 1; fast lightning in phase 2.
     if (b.introT <= 0) {
       b.shootTimer--;
       if (b.shootTimer <= 0) {
-        this.bossShoot(enraged);
-        b.shootTimer = enraged ? 80 : 120; // Slower shoot rate to dodge easier
+        if (phase2) {
+          this.bossShootLightning();
+          b.shootTimer = 70;
+        } else {
+          this.bossShoot(false);
+          b.shootTimer = 135;
+        }
       }
     }
 
@@ -1939,6 +1957,24 @@ const Game = {
         x: b.x, y: b.y + 18,
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
         kind: 'bat', frame: 0, alive: true
+      });
+    });
+    AudioEngine.playShootSFX();
+  },
+
+  // Phase 2 attack: a forked lightning bolt aimed straight at Ellen, much faster
+  // than the phase-1 orbs so it's far harder to sidestep.
+  bossShootLightning() {
+    const b = this.boss;
+    const playerMidY = this.player.y - 28;
+    const a = Math.atan2(playerMidY - b.y, this.player.x - b.x);
+    const sp = this.combat.enemyBulletSpeed * 2.1; // ~2.5x a normal boss shot
+    [-0.05, 0.05].forEach(off => {
+      const ang = a + off;
+      this.enemyProjectiles.push({
+        x: b.x, y: b.y + 18,
+        vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+        kind: 'lightning', frame: 0, alive: true
       });
     });
     AudioEngine.playShootSFX();
@@ -3018,6 +3054,8 @@ const Game = {
       if (rx > -30 && rx < this.width + 30) {
         if (p.friendly) {
           Assets.drawBullet(this.ctx, rx, p.y, Math.sign(p.vx) || 1, (p.frame || 0) * 0.3);
+        } else if (p.kind === 'lightning') {
+          Assets.drawLightningBolt(this.ctx, rx, p.y, Math.atan2(p.vy, p.vx), p.frame || 0);
         } else {
           Assets.drawEnemyBullet(this.ctx, rx, p.y, p.kind, p.frame);
         }
