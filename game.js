@@ -419,7 +419,15 @@ const Game = {
   heartsCollected: 0,
   totalHearts: 0,
   currentLevelIndex: 0,
-  
+
+  // Walk-through memory text (see drawStoryBanner): each dialogue line is spaced
+  // STORY_STEP px apart, so inching forward reveals the next line and walking
+  // back re-shows the previous one. STORY_LEAD is the fade-in/out runway at the
+  // edges of a memory's reading zone. The enemy spawner uses the same zone
+  // (storyZone) to keep fighting away from story text.
+  STORY_STEP: 240,
+  STORY_LEAD: 170,
+
   // Player properties
   player: {
     x: 150,
@@ -726,7 +734,12 @@ const Game = {
     this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
     this.pickups.push({ x: locketX, y: groundY, kind: 'locket', collected: false, frame: 0 });
 
-    const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
+    // Keep enemies out of each memory's full story-reading span (+ a margin) so
+    // fighting and story text never share the screen.
+    const nearMilestone = (x) => this.levels.some(l => {
+      const z = this.storyZone(l);
+      return x >= z.start - 70 && x <= z.end + 70;
+    });
     const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150 || Math.abs(x - locketX) < 150;
 
     // Don't let a random hurdle (e.g. the camping campfire art) sit on top of a
@@ -2440,10 +2453,16 @@ const Game = {
   },
 
   triggerMilestone(lvlIndex) {
-    this.isPaused = true;
     this.currentLevelIndex = lvlIndex;
-    
-    // Lock player walking keys
+
+    // Earlier memories no longer freeze the game — their story is revealed as a
+    // floating banner that advances with Ellen's position (see drawStoryBanner),
+    // so she can stroll through (or back over) the words at her own pace. Only
+    // the final Mt. Fuji milestone keeps the modal: it's the climactic finale
+    // that leads straight into the ending celebration.
+    if (lvlIndex !== this.levels.length - 1) return;
+
+    this.isPaused = true;
     this.player.vx = 0;
 
     const lvl = this.levels[lvlIndex];
@@ -2454,7 +2473,7 @@ const Game = {
     document.getElementById('dialog-title').innerText = lvl.name;
     document.getElementById('dialog-date').innerText = lvl.year;
     document.getElementById('dialog-text').innerText = this.activeDialog[0];
-    
+
     const actionBtn = document.getElementById('dialog-action-btn');
     if (this.activeDialog.length > 1) {
       actionBtn.innerText = "Next ➡️";
@@ -2624,6 +2643,123 @@ const Game = {
 
     // Progressive control hints in the sky near the start (walk -> jump -> chop)
     this.drawTutorialHints();
+
+    // Walk-through memory story (replaces the old freezing dialogue modal)
+    this.drawStoryBanner();
+  },
+
+  // The on-screen span over which a memory's story is read. Line 0 sits roughly
+  // at the milestone marker; each subsequent line is STORY_STEP px further on,
+  // with a STORY_LEAD fade runway at each edge. Shared by the banner and the
+  // enemy spawner so combat never overlaps the words.
+  storyZone(lvl) {
+    const n = (lvl.dialogue && lvl.dialogue.length) || 1;
+    const s0 = lvl.x - 60;
+    return {
+      n,
+      s0,
+      start: s0 - this.STORY_LEAD,
+      end: s0 + (n - 1) * this.STORY_STEP + this.STORY_LEAD,
+    };
+  },
+
+  // Greedy word-wrap for canvas text → array of lines that each fit maxWidth.
+  wrapText(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (cur && ctx.measureText(test).width > maxWidth) {
+        lines.push(cur);
+        cur = w;
+      } else {
+        cur = test;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  },
+
+  // Floating "memory card" near the top of the screen. The line shown is chosen
+  // purely by Ellen's x position, so walking forward advances the story and
+  // walking back rewinds it — no pause, no button. The finale (Mt. Fuji) is the
+  // one exception that still uses the modal.
+  drawStoryBanner() {
+    if (!this.levels || this.isPaused) return;
+    if (this.bossActive && !this.bossDefeated) return;
+
+    const px = this.player.x;
+    const lastIdx = this.levels.length - 1;
+    let active = null, zone = null;
+    for (let i = 0; i < lastIdx; i++) {
+      const z = this.storyZone(this.levels[i]);
+      if (px >= z.start && px <= z.end) { active = this.levels[i]; zone = z; break; }
+    }
+    if (!active) return;
+
+    // Which line are we on, and how strongly is the card faded in?
+    const idx = Math.max(0, Math.min(zone.n - 1, Math.round((px - zone.s0) / this.STORY_STEP)));
+    const edge = Math.min(px - zone.start, zone.end - px);
+    const alpha = Math.max(0, Math.min(1, edge / this.STORY_LEAD));
+    if (alpha <= 0.01) return;
+
+    const ctx = this.ctx;
+    const cx = this.width / 2;
+    const boxW = Math.min(620, this.width - 80);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+
+    ctx.font = '600 19px "Outfit", sans-serif';
+    const bodyLines = this.wrapText(ctx, active.dialogue[idx], boxW - 56);
+    const lineH = 25, headerH = 22, gap = 10, padTop = 16, padBot = 20, dotsH = 14;
+    const boxH = padTop + headerH + gap + bodyLines.length * lineH + dotsH + padBot;
+    const bx = cx - boxW / 2, by = 56, r = 18;
+
+    // Rounded translucent backdrop
+    ctx.fillStyle = 'rgba(20, 24, 40, 0.62)';
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by);
+    ctx.arcTo(bx + boxW, by, bx + boxW, by + boxH, r);
+    ctx.arcTo(bx + boxW, by + boxH, bx, by + boxH, r);
+    ctx.arcTo(bx, by + boxH, bx, by, r);
+    ctx.arcTo(bx, by, bx + boxW, by, r);
+    ctx.closePath();
+    ctx.fill();
+
+    // Header: memory name • year
+    let y = by + padTop + 8;
+    ctx.font = '700 15px "Fredoka", "Outfit", sans-serif';
+    ctx.fillStyle = '#ffd1dc';
+    ctx.fillText(`${active.name}  •  ${active.year}`, cx, y);
+    y += headerH + gap;
+
+    // Body line
+    ctx.font = '600 19px "Outfit", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    for (const bl of bodyLines) { ctx.fillText(bl, cx, y); y += lineH; }
+
+    // Progress dots
+    y += 2;
+    const dotGap = 13, totalW = (zone.n - 1) * dotGap;
+    for (let d = 0; d < zone.n; d++) {
+      ctx.beginPath();
+      ctx.arc(cx - totalW / 2 + d * dotGap, y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = d === idx ? '#ffd1dc' : 'rgba(255,255,255,0.3)';
+      ctx.fill();
+    }
+
+    // Gentle nudge on the first line so the player knows to keep walking
+    if (idx === 0 && zone.n > 1) {
+      ctx.globalAlpha = alpha * 0.7;
+      ctx.font = '500 11px "Outfit", sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('keep walking to read on  →', cx, by + boxH + 15);
+    }
+
+    ctx.restore();
   },
 
   // Floating control hints that fade in/out as Ellen walks past them.
@@ -3388,3 +3524,24 @@ window.addEventListener('load', async () => {
   await initWasm();
   Game.init();
 });
+
+// --- Pause audio when the page is hidden / backgrounded ---------------------
+// On the TV, hitting Back sends the app to the background; on mobile, switching
+// apps or locking the screen hides the tab. In either case the synthesized
+// music would otherwise keep playing. Suspending the AudioContext halts the
+// audio thread immediately; we only resume if the player hasn't muted music.
+(function () {
+  function suspendAudio() {
+    if (AudioEngine.ctx && AudioEngine.ctx.state === 'running') AudioEngine.ctx.suspend();
+  }
+  function resumeAudio() {
+    if (AudioEngine.userMusicOn && AudioEngine.ctx && AudioEngine.ctx.state === 'suspended') {
+      AudioEngine.ctx.resume();
+    }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) suspendAudio(); else resumeAudio();
+  });
+  window.addEventListener('pagehide', suspendAudio);
+  window.addEventListener('pageshow', resumeAudio);
+})();

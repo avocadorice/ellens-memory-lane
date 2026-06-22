@@ -11,8 +11,8 @@ android {
         applicationId "com.ellensmemorylane.tv"
         minSdk 21          // Android 5.0 — covers all Android TV / Google TV devices
         targetSdk 34
-        versionCode 5
-        versionName "1.4"
+        versionCode 6
+        versionName "1.5"
     }
 
     buildTypes {

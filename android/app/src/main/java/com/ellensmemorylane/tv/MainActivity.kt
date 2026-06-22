@@ -367,9 +367,23 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
         super.onResume()
         hideSystemUi()
         webView.onResume()
+        // Resume the synthesized music if the player hadn't muted it. (Android's
+        // WebView.onPause/onResume doesn't reliably fire the page's
+        // visibilitychange, so we drive the AudioContext explicitly.)
+        webView.evaluateJavascript(
+            "try{ if (AudioEngine.userMusicOn && AudioEngine.ctx && " +
+                "AudioEngine.ctx.state==='suspended') AudioEngine.ctx.resume(); }catch(e){}",
+            null,
+        )
     }
 
     override fun onPause() {
+        // Halt Web Audio immediately so music doesn't keep playing after Back.
+        webView.evaluateJavascript(
+            "try{ if (AudioEngine.ctx && AudioEngine.ctx.state==='running') " +
+                "AudioEngine.ctx.suspend(); }catch(e){}",
+            null,
+        )
         webView.onPause()
         super.onPause()
     }
