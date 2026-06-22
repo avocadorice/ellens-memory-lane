@@ -3366,24 +3366,20 @@ const Assets = {
     ctx.rotate(angle);
     const flick = 0.7 + 0.3 * Math.abs(Math.sin((frame || 0) * 0.9));
     const pts = [[-17, 0], [-7, -7], [-1, 3], [7, -6], [13, 4], [19, -1]];
-    const trace = () => {
+    // Layered strokes fake a glow WITHOUT ctx.shadowBlur (which is far too
+    // expensive on the TV GPU and was halving the frame rate).
+    const trace = (w, color) => {
+      ctx.lineWidth = w;
+      ctx.strokeStyle = color;
       ctx.beginPath();
       pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
       ctx.stroke();
     };
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    // outer glow
-    ctx.shadowColor = 'rgba(150,205,255,1)';
-    ctx.shadowBlur = 18;
-    ctx.strokeStyle = `rgba(255,240,140,${flick})`;
-    ctx.lineWidth = 5;
-    trace();
-    // bright white core
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    trace();
+    trace(8, `rgba(150,205,255,${0.22 * flick})`); // soft wide glow
+    trace(5, `rgba(255,240,140,${flick})`);         // golden body
+    trace(2, '#ffffff');                            // bright core
     // sparking tip
     ctx.fillStyle = `rgba(150,215,255,${flick})`;
     ctx.beginPath();

@@ -1765,11 +1765,10 @@ const Game = {
   soccerActive() {
     return this.player.hasSoccer && this.player.x >= this.soccerStart;
   },
-  // The full circular-queue line formation: only in the gauntlet (during the
-  // boss she keeps normal control so she can dodge).
+  // The full circular-queue line formation — runs in the gauntlet AND on into
+  // the boss fight (the line still moves/jumps with the player, so she can dodge).
   soccerFormationActive() {
-    return this.soccerActive() && !this.bossActive &&
-      this.soccerQueue && this.soccerQueue.length > 0;
+    return this.soccerActive() && this.soccerQueue && this.soccerQueue.length > 0;
   },
 
   // Kick a soccer ball. In the gauntlet the FRONT of the line kicks, then the
@@ -1787,8 +1786,7 @@ const Game = {
       const baseX = (this.soccerPos && this.soccerPos[who] != null) ? this.soccerPos[who] : this.player.x;
       spawnX = baseX + dir * 16;
       spawnY = (this.height - 80) - 18;
-      if (who === 'player') this.shout = { text: 'Hup!', timer: this.player.attackMax + 8 };
-      else if (this.hopTimers) this.hopTimers[who] = 15; // kick hop
+      if (this.hopTimers && who !== 'player') this.hopTimers[who] = 15; // kick hop
       // Rotate the circular queue: the kicker moves to the back.
       this.soccerQueue.push(this.soccerQueue.shift());
       this.soccerJogId = who;
@@ -1796,7 +1794,6 @@ const Game = {
     } else {
       spawnX = this.player.x + dir * 22;
       spawnY = this.player.y - 18;
-      this.shout = { text: 'Hup!', timer: this.player.attackMax + 8 };
     }
 
     this.projectiles.push({
@@ -3260,9 +3257,17 @@ const Game = {
     const r = b.w * 0.5;
     ctx.save();
 
-    // Glowing storm aura
-    ctx.shadowColor = flash ? '#ffffff' : 'rgba(150,90,255,0.85)';
-    ctx.shadowBlur = 26;
+    // Glowing storm aura — a single cheap radial-gradient halo instead of an
+    // expensive per-puff shadowBlur (6× blur every frame was halving the FPS).
+    const auraR = r * 2.1;
+    const auraCol = flash ? '255,255,255' : '150,90,255';
+    const aura = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, auraR);
+    aura.addColorStop(0, `rgba(${auraCol},0.5)`);
+    aura.addColorStop(1, `rgba(${auraCol},0)`);
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraR, 0, Math.PI * 2);
+    ctx.fill();
 
     // Cloud body: a cluster of dark puffs
     ctx.fillStyle = flash ? '#ffffff' : '#2a2440';
@@ -3272,7 +3277,6 @@ const Game = {
       ctx.arc(cx + ox * b.w, cy + oy * b.w + Math.sin(t * 0.1 + ox) * 2, pr * r, 0, Math.PI * 2);
       ctx.fill();
     });
-    ctx.shadowBlur = 0;
 
     // Lighter inner highlight
     ctx.fillStyle = flash ? '#ffffff' : '#473a6e';
