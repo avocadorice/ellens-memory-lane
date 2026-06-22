@@ -2732,9 +2732,14 @@ const Game = {
     const bodyLines = this.wrapText(ctx, active.dialogue[idx], boxW - 56);
     const lineH = 25, headerH = 22, gap = 10, padTop = 16, padBot = 20, dotsH = 14;
     const boxH = padTop + headerH + gap + bodyLines.length * lineH + dotsH + padBot;
-    // Anchored near the bottom (subtitle-style) so it never covers the floating
-    // polaroid album, which lives up top.
-    const bx = cx - boxW / 2, by = this.height - boxH - 40, r = 18;
+    // Float the card in the open middle band — below the polaroid album (cardH
+    // 145, centred ~y125, so its base is ~y205) and above the characters/ground
+    // near the bottom — so it overlaps neither.
+    const albumBottom = 210;
+    const groundTop = this.height - 150;
+    let by = Math.round((albumBottom + groundTop) / 2 - boxH / 2);
+    by = Math.max(albumBottom, Math.min(by, groundTop - boxH));
+    const bx = cx - boxW / 2, r = 18;
 
     // Rounded translucent backdrop
     ctx.fillStyle = 'rgba(20, 24, 40, 0.62)';
