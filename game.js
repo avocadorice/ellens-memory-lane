@@ -639,8 +639,10 @@ const Game = {
     // Reset player combat loadout
     this.player.weapon = null;
     this.player.hasBalls = false;
-    this.kickerIndex = 0;        // whose turn to kick in the soccer gauntlet
-    this.soccerBannerShown = false;
+    this.player.hasSoccer = false; // granted by the soccer-ball pickup
+    this.soccerQueue = null;       // circular kicking line (built on pickup)
+    this.soccerPos = {};           // animated display x per family member
+    this.soccerJogT = 0;
     this.hopTimers = { husband: 0, kid1: 0, kid2: 0, dog: 0 };
     this.player.health = this.player.maxHealth;
     this.player.attackTimer = 0;
@@ -729,8 +731,10 @@ const Game = {
     this.racketX = racketX;
     this.ballsX = ballsX;
 
-    // Pickups: tennis racket + tennis balls
+    // Pickups: tennis racket + the soccer ball (grants the family-soccer kick at
+    // the start of the gauntlet).
     this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
+    this.pickups.push({ x: this.soccerStart + 80, y: groundY, kind: 'soccer', collected: false, frame: 0 });
 
     const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
     const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150;
@@ -1720,15 +1724,6 @@ const Game = {
       }
     });
 
-    // Soccer gauntlet intro banner (once, on entry)
-    if (!this.soccerBannerShown && this.inSoccerZone()) {
-      this.soccerBannerShown = true;
-      this.banner = {
-        timer: 320,
-        text: '⚽ Family soccer! The family takes turns — kick the ball at the foes!'
-      };
-    }
-
     // Combat systems (pickups, enemies, projectiles, trampolines, damage)
     this.updateCombat();
   },
@@ -1740,9 +1735,9 @@ const Game = {
     if (!this.isRunning || this.isPaused || this.player.isDead) return;
     if (this.player.attackTimer > 0) return;    // mid-swing/chop/kick
 
-    // Soccer gauntlet (the pre-boss stretch): ranged offense becomes a rotating
-    // family soccer-ball kick instead of melee.
-    if (this.inSoccerZone()) {
+    // Soccer: once she's grabbed the soccer ball, the ranged attack becomes a
+    // kicked soccer ball (in the gauntlet AND on into the boss fight).
+    if (this.soccerActive()) {
       this.kickSoccerBall();
       return;
     }
@@ -1761,54 +1756,53 @@ const Game = {
     }
   },
 
-  // The soccer gauntlet runs from soccerStart up to the boss arena.
+  // The x-range of the soccer gauntlet (where the pickup + soccer foes live).
   inSoccerZone() {
-    return !this.bossActive &&
-      this.player.x >= this.soccerStart && this.player.x < this.bossArenaStart;
+    return this.player.x >= this.soccerStart && this.player.x < this.bossArenaStart;
+  },
+  // The soccer kick is available once she's picked up the ball and reached the
+  // gauntlet — and it carries on through the boss fight.
+  soccerActive() {
+    return this.player.hasSoccer && this.player.x >= this.soccerStart;
+  },
+  // The full circular-queue line formation: only in the gauntlet (during the
+  // boss she keeps normal control so she can dodge).
+  soccerFormationActive() {
+    return this.soccerActive() && !this.bossActive &&
+      this.soccerQueue && this.soccerQueue.length > 0;
   },
 
-  // The order the family takes turns kicking. In this late zone all five are
-  // present (Ellen, Barney, Preston=kid1, Blaire=kid2, Mochi=dog).
-  SOCCER_ORDER: ['player', 'husband', 'kid1', 'kid2', 'dog'],
-
-  // Family soccer: the front-of-line kicker boots a soccer ball, then rotates to
-  // the back so the next family member is up. kickerIndex always points at whose
-  // turn is NEXT (so the dribble ball is drawn at their feet — see drawForeground).
+  // Kick a soccer ball. In the gauntlet the FRONT of the line kicks, then the
+  // circular queue rotates (front jogs to the back). In the boss fight Ellen
+  // keeps normal control and kicks the ball herself.
   kickSoccerBall() {
-    const order = this.SOCCER_ORDER;
-    const idx = (this.kickerIndex || 0) % order.length;
-    this.kickerIndex = (idx + 1) % order.length;
-    const who = order[idx];
     const dir = this.player.dir;
-
-    // Brief kick animation + cooldown via attackTimer.
     this.player.attackType = 'karate';
     this.player.attackMax = this.combat.karateDuration;
     this.player.attackTimer = this.player.attackMax;
 
-    let spawnX = this.player.x + dir * 22;
-    let spawnY = this.player.y - 18;
-    if (who === 'player') {
-      this.shout = { text: 'Hup!', timer: this.player.attackMax + 8 };
+    let spawnX, spawnY;
+    if (this.soccerFormationActive()) {
+      const who = this.soccerQueue[0];
+      const baseX = (this.soccerPos && this.soccerPos[who] != null) ? this.soccerPos[who] : this.player.x;
+      spawnX = baseX + dir * 16;
+      spawnY = (this.height - 80) - 18;
+      if (who === 'player') this.shout = { text: 'Hup!', timer: this.player.attackMax + 8 };
+      else if (this.hopTimers) this.hopTimers[who] = 15; // kick hop
+      // Rotate the circular queue: the kicker moves to the back.
+      this.soccerQueue.push(this.soccerQueue.shift());
+      this.soccerJogId = who;
+      this.soccerJogT = 22; // animate the jog to the back
     } else {
-      const comp = this.companions.find(c => c.type === who);
-      if (comp) {
-        spawnX = comp.x + dir * 14;
-        spawnY = comp.y - 18;
-        if (this.hopTimers) this.hopTimers[who] = 15; // little kick hop
-      }
+      spawnX = this.player.x + dir * 22;
+      spawnY = this.player.y - 18;
+      this.shout = { text: 'Hup!', timer: this.player.attackMax + 8 };
     }
 
     this.projectiles.push({
-      x: spawnX,
-      y: spawnY,
-      vx: dir * this.combat.ballSpeedX,
-      vy: this.combat.ballSpeedY,
-      spin: 0,
-      bounced: false,
-      dir,
-      alive: true,
-      type: 'soccer_ball'
+      x: spawnX, y: spawnY,
+      vx: dir * this.combat.ballSpeedX, vy: this.combat.ballSpeedY,
+      spin: 0, bounced: false, dir, alive: true, type: 'soccer_ball'
     });
     AudioEngine.playShootSFX();
   },
@@ -2081,6 +2075,14 @@ const Game = {
           this.banner = {
             timer: 240,
             text: '🎾 Tennis racket! Longer reach than your karate chop — swing at the monsters'
+          };
+        } else if (pk.kind === 'soccer') {
+          this.player.hasSoccer = true;
+          this.soccerQueue = ['player', 'husband', 'kid1', 'kid2', 'dog'];
+          this.soccerPos = {};
+          this.banner = {
+            timer: 320,
+            text: '⚽ Soccer ball! The family lines up — kick it at the foes, taking turns!'
           };
         }
       }
@@ -3067,9 +3069,10 @@ const Game = {
       }
     });
 
-    // Draw active companion entities
+    // Draw active companion entities (replaced by the soccer line in the gauntlet)
     const lvlIdx = this.getLevelIndexAtX(this.player.x);
-    this.companions.forEach(comp => {
+    const soccerForm = this.soccerFormationActive();
+    if (!soccerForm) this.companions.forEach(comp => {
       const rx = comp.x - camX;
       if (rx > -60 && rx < this.width + 60) {
         let drawY = comp.y;
@@ -3091,10 +3094,10 @@ const Game = {
       }
     });
 
-    // Draw Ellen (blinks while invulnerable just after taking a hit)
+    // Draw Ellen (skipped during the soccer line, which draws the whole family)
     const pX = this.player.x - camX;
     const blink = this.player.invuln > 0 && Math.floor(this.player.invuln / 4) % 2 === 0;
-    if (!blink) {
+    if (!soccerForm && !blink) {
       const attacking = this.player.attackTimer > 0;
       const isKarate = this.player.attackType === 'karate';
       const shouting = attacking && isKarate;
@@ -3135,37 +3138,73 @@ const Game = {
       }
     }
 
-    // Soccer dribble: a ball at the feet of whoever kicks next, so it's clear
-    // whose turn it is as the "ball" passes down the rotating line.
-    if (this.inSoccerZone()) this.drawSoccerDribble(camX);
+    // Soccer: the gauntlet draws the whole family as a circular kicking line;
+    // during the boss fight Ellen keeps normal control and just dribbles a ball.
+    if (soccerForm) {
+      this.drawSoccerLine(camX, lvlIdx);
+    } else if (this.soccerActive()) {
+      const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
+      Assets.drawSoccerBall(this.ctx, pX + this.player.dir * 16, this.player.y - 6 - bob, Date.now() * 0.02);
+    }
 
     // HUD is drawn by the main loop (outside the zoom transform), not here.
   },
 
-  drawSoccerDribble(camX) {
-    const order = this.SOCCER_ORDER;
-    const who = order[(this.kickerIndex || 0) % order.length];
+  // The circular kicking queue rendered as a physical line: the front member is
+  // the kicker (with the dribble ball + a name marker). After a kick the queue
+  // rotates and the ex-kicker jogs to the back while everyone shifts forward.
+  drawSoccerLine(camX, lvlIdx) {
+    const q = this.soccerQueue;
+    if (!q || !q.length) return;
+    if (!this.soccerPos) this.soccerPos = {};
     const groundY = this.height - 80;
-    let fx = this.player.x, fy = this.player.y, name = 'Ellen';
-    if (who !== 'player') {
-      const comp = this.companions.find(c => c.type === who);
-      if (comp) { fx = comp.x; fy = comp.y; }
-      name = { husband: 'Barney', kid1: 'Preston', kid2: 'Blaire', dog: 'Mochi' }[who] || '';
-    }
     const dir = this.player.dir;
-    const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
-    Assets.drawSoccerBall(this.ctx, fx - camX + dir * 16, (fy || groundY) - 6 - bob, Date.now() * 0.02);
+    const spacing = 48;
+    const frame = this.player.animFrame;
+    if (this.soccerJogT > 0) this.soccerJogT--;
 
-    // Little marker above the current kicker so the rotation is legible.
-    const sx = fx - camX;
-    this.ctx.save();
-    this.ctx.globalAlpha = 0.85;
-    this.ctx.textAlign = 'center';
-    this.ctx.font = '700 11px Outfit';
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.fillText(`⚽ ${name}`, sx, (fy || groundY) - 96);
-    this.ctx.fillText('▾', sx, (fy || groundY) - 86);
-    this.ctx.restore();
+    q.forEach((id, i) => {
+      const targetX = this.player.x - dir * i * spacing; // slot i; front (i=0) = controlled x
+      if (this.soccerPos[id] == null) this.soccerPos[id] = targetX;
+      this.soccerPos[id] += (targetX - this.soccerPos[id]) * 0.18;
+
+      let drawY = groundY;
+      if (id === this.soccerJogId && this.soccerJogT > 0) {
+        drawY -= Math.sin((1 - this.soccerJogT / 22) * Math.PI) * 22; // jog-to-back arc
+      }
+      const hop = this.hopTimers ? this.hopTimers[id] : 0;
+      if (hop > 0) drawY -= 22 * Math.sin((hop / 15) * Math.PI);
+
+      const rx = this.soccerPos[id] - camX;
+      if (rx < -70 || rx > this.width + 70) return;
+      if (id === 'player') {
+        Assets.drawEllen(this.ctx, rx, drawY, this.player.outfit, frame, dir, 1, false);
+      } else if (id === 'husband') {
+        Assets.drawHusband(this.ctx, rx, drawY, this.getHusbandOutfit(lvlIdx), frame, dir);
+      } else if (id === 'dog') {
+        Assets.drawDog(this.ctx, rx, drawY, frame, dir);
+      } else {
+        Assets.drawKid(this.ctx, rx, drawY, id, frame, dir, lvlIdx);
+      }
+    });
+
+    // Dribble ball + name marker on the front kicker
+    const front = q[0];
+    const fx = this.soccerPos[front];
+    if (fx != null) {
+      const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
+      Assets.drawSoccerBall(this.ctx, fx - camX + dir * 16, groundY - 6 - bob, Date.now() * 0.02);
+      const name = { player: 'Ellen', husband: 'Barney', kid1: 'Preston', kid2: 'Blaire', dog: 'Mochi' }[front] || '';
+      const sx = fx - camX;
+      this.ctx.save();
+      this.ctx.globalAlpha = 0.85;
+      this.ctx.textAlign = 'center';
+      this.ctx.font = '700 11px Outfit';
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.fillText('⚽ ' + name, sx, groundY - 96);
+      this.ctx.fillText('▾', sx, groundY - 86);
+      this.ctx.restore();
+    }
   },
 
   // A bank of storm clouds shrouding Mt. Fuji. `alpha` fades 1 -> 0 as the
@@ -3334,7 +3373,7 @@ const Game = {
         wIcon = '🥋';
         wWidth = 86;
       }
-      if (this.inSoccerZone()) {
+      if (this.soccerActive()) {
         wName = 'Family Soccer';
         wIcon = '⚽';
         wWidth = 120;

@@ -2693,6 +2693,13 @@ const Assets = {
           ctx.beginPath(); ctx.moveTo(-10, j); ctx.lineTo(10, j); ctx.stroke();
         }
         ctx.restore();
+      } else if (kind === 'soccer') {
+        // A big soccer ball sitting on the ground
+        ctx.save();
+        ctx.translate(0, -12);
+        ctx.scale(1.9, 1.9);
+        this.drawSoccerBall(ctx, 0, 0, frame * 0.03);
+        ctx.restore();
       } else {
         // A few tennis balls
         const ball = (bx, by) => {
