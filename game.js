@@ -2161,9 +2161,12 @@ const Game = {
     const usingRacket = this.player.attackType === 'racket';
     const hReach = usingRacket ? this.combat.swingReach : this.combat.karateReach;
     const vReach = usingRacket ? this.combat.swingVReach : this.combat.karateVReach;
+    // While the soccer ball is equipped she only kicks (ranged) — no melee swing,
+    // so a kick near the boss/enemies doesn't also land a hidden hit.
+    const meleeActive = this.player.attackTimer > 0 && !this.soccerActive();
 
     // --- Melee can also hit the boss when it dives low enough ---
-    if (this.player.attackTimer > 0 &&
+    if (meleeActive &&
         this.boss && this.boss.alive && this.boss.lastSwingHit !== this._swingId) {
       const b = this.boss;
       const dir = this.player.dir;
@@ -2178,7 +2181,7 @@ const Game = {
     // One swing damages a given enemy at most once (guarded by swing id), so a
     // 2-hit monster survives a single swing. Vertical reach (vReach) is what
     // makes karate vs racket matter against flying foes.
-    if (this.player.attackTimer > 0) {
+    if (meleeActive) {
       const dir = this.player.dir;
       this.enemies.forEach(e => {
         if (!e.alive) return;
@@ -2195,7 +2198,7 @@ const Game = {
     // Connect with an incoming shot during the racket's SWEET SPOT for an
     // accurate return that homes toward the foe. Mistime the swing and the shot
     // just clanks off at a bad angle and sails wide.
-    if (usingRacket && this.player.attackTimer > 0) {
+    if (usingRacket && meleeActive) {
       const dir = this.player.dir;
       const prog = 1 - this.player.attackTimer / (this.player.attackMax || this.combat.swingDuration);
       const sweet = prog >= 0.15 && prog <= 0.55;
@@ -3113,8 +3116,8 @@ const Game = {
         shouting // open her mouth mid karate chop
       );
 
-      // Racket held in hand (sways with her stride, swings on attack)
-      if (this.player.weapon) {
+      // Racket held in hand (hidden while the soccer ball is equipped)
+      if (this.player.weapon && !this.soccerActive()) {
         const swing = attacking
           ? 1 - this.player.attackTimer / (this.player.attackMax || this.combat.swingDuration)
           : 0;
@@ -3122,8 +3125,8 @@ const Game = {
         Assets.drawHeldWeapon(this.ctx, pX, this.player.y, this.player.weapon, this.player.dir, swing, this.player.animFrame, moving);
       }
 
-      // Attack effect: racket slash arc, or a karate chop
-      if (attacking) {
+      // Attack effect: racket slash arc, or a karate chop (not while kicking)
+      if (attacking && !this.soccerActive()) {
         const prog = 1 - this.player.attackTimer / (this.player.attackMax || this.combat.swingDuration);
         if (isKarate) {
           Assets.drawKarateChop(this.ctx, pX + this.player.dir * 12, this.player.y - 32, this.player.dir, prog);
@@ -3161,6 +3164,9 @@ const Game = {
     const dir = this.player.dir;
     const spacing = 48;
     const frame = this.player.animFrame;
+    // Echo the player's jump down the line (front follows it exactly, the rest
+    // ripple a few frames behind — so jumping is visible again).
+    const hist = this.player.yHistory || [];
     if (this.soccerJogT > 0) this.soccerJogT--;
 
     q.forEach((id, i) => {
@@ -3168,7 +3174,7 @@ const Game = {
       if (this.soccerPos[id] == null) this.soccerPos[id] = targetX;
       this.soccerPos[id] += (targetX - this.soccerPos[id]) * 0.18;
 
-      let drawY = groundY;
+      let drawY = groundY + (hist[Math.min(i * 3, hist.length - 1)] || 0);
       if (id === this.soccerJogId && this.soccerJogT > 0) {
         drawY -= Math.sin((1 - this.soccerJogT / 22) * Math.PI) * 22; // jog-to-back arc
       }
@@ -3192,8 +3198,9 @@ const Game = {
     const front = q[0];
     const fx = this.soccerPos[front];
     if (fx != null) {
+      const frontY = groundY + (hist[0] || 0); // follow the jump
       const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
-      Assets.drawSoccerBall(this.ctx, fx - camX + dir * 16, groundY - 6 - bob, Date.now() * 0.02);
+      Assets.drawSoccerBall(this.ctx, fx - camX + dir * 16, frontY - 6 - bob, Date.now() * 0.02);
       const name = { player: 'Ellen', husband: 'Barney', kid1: 'Preston', kid2: 'Blaire', dog: 'Mochi' }[front] || '';
       const sx = fx - camX;
       this.ctx.save();
@@ -3201,8 +3208,8 @@ const Game = {
       this.ctx.textAlign = 'center';
       this.ctx.font = '700 11px Outfit';
       this.ctx.fillStyle = '#ffffff';
-      this.ctx.fillText('⚽ ' + name, sx, groundY - 96);
-      this.ctx.fillText('▾', sx, groundY - 86);
+      this.ctx.fillText('⚽ ' + name, sx, frontY - 96);
+      this.ctx.fillText('▾', sx, frontY - 86);
       this.ctx.restore();
     }
   },
