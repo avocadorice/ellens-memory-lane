@@ -31,7 +31,7 @@ const levelsData = [
     id: 1,
     name: "Graduation",
     year: "June 2012",
-    x: 3200,
+    x: 5600,
     photos: ["photos/graduation.JPG"],
     skyGradient: {
       top: "#a1c4fd",
@@ -53,7 +53,7 @@ const levelsData = [
     id: 2,
     name: "Adopting Mochi",
     year: "July 2012",
-    x: 4400,
+    x: 9200,
     photos: ["photos/mochi.JPG", "photos/IMG_2507.jpg"],
     skyGradient: {
       top: "#89f7fe",
@@ -75,7 +75,7 @@ const levelsData = [
     id: 5,
     name: "Our First Home",
     year: "December 2016",
-    x: 5600,
+    x: 12800,
     photos: ["photos/first_home.jpg"],
     skyGradient: {
       top: "#fbc2eb",
@@ -97,7 +97,7 @@ const levelsData = [
     id: 3,
     name: "The Engagement",
     year: "March 2018",
-    x: 6800,
+    x: 16400,
     photos: ["photos/proposal.jpg", "photos/DSC_6346.jpg", "photos/IMG_2110.JPG"],
     skyGradient: {
       top: "#fddb92",
@@ -119,7 +119,7 @@ const levelsData = [
     id: 4,
     name: "Our Wedding Day",
     year: "October 2018",
-    x: 8000,
+    x: 20000,
     photos: ["photos/wedding.JPG", "photos/IMG_4496.JPG", "photos/IMG_4500.JPG", "photos/IMG_1633.JPG"],
     skyGradient: {
       top: "#ff9a9e",
@@ -141,7 +141,7 @@ const levelsData = [
     id: 6,
     name: "Welcoming Preston",
     year: "July 2019",
-    x: 9200,
+    x: 23600,
     photos: ["photos/ellen_preston.JPG", "photos/AG3_2242.jpg", "photos/IMG_3673.jpg", "photos/IMG_7003.jpg", "photos/IMG_7147.jpg"],
     skyGradient: {
       top: "#b1f2ff",
@@ -163,7 +163,7 @@ const levelsData = [
     id: 7,
     name: "Moving to Our Second House",
     year: "October 2020",
-    x: 10400,
+    x: 27200,
     photos: ["photos/2nd_home.webp"],
     // Frame the full width of the house, trimming most of the foreground road
     photoCrop: { zoom: 1.35, focusX: 0.03, focusY: 0.18 },
@@ -187,7 +187,7 @@ const levelsData = [
     id: 8,
     name: "Welcoming Blaire",
     year: "August 2024",
-    x: 11600,
+    x: 30800,
     photos: [
       "photos/ellen_blaire.jpg",
       "photos/D41E430D-92A3-4FAA-91FB-F022EE2C4E7D.JPG",
@@ -221,7 +221,7 @@ const levelsData = [
     id: 9,
     name: "RV Camping Adventures",
     year: "2025",
-    x: 12800,
+    x: 34400,
     photos: [
       "photos/airstream_camping.jpg",
       "photos/bean_trailer_camping.jpg",
@@ -251,7 +251,7 @@ const levelsData = [
     id: 10,
     name: "The Family at Mt. Fuji",
     year: "2026",
-    x: 16200,
+    x: 37880,
     photos: ["photos/mt_fuji.jpg", "photos/IMG_2680.JPG", "photos/IMG_2817.jpg"],
     // Shift the floating photos to the upper-right so they don't cover the mountain
     cardDX: 175,

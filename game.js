@@ -500,9 +500,9 @@ const Game = {
   boss: null,
   bossActive: false,    // fight in progress (invisible wall up)
   bossDefeated: false,  // beaten → Fuji photos reveal + path opens
-  bossArenaStart: 15520, // x where the fight begins (after the soccer gauntlet, before Fuji)
-  bossWallX: 16100,      // Ellen can roam the full arena up to here (just shy of Fuji)
-  soccerStart: 13450,    // x where the family soccer gauntlet begins (after RV camping)
+  bossArenaStart: 37200, // x where the fight begins (after the soccer gauntlet, before Fuji)
+  bossWallX: 37780,      // Ellen can roam the full arena up to here (just shy of Fuji)
+  soccerStart: 35100,    // x where the family soccer gauntlet begins (after RV camping)
   fujiRevealProgress: 0, // 0 = Mt. Fuji shrouded in storm clouds, 1 = fully revealed
   viewZoom: 1,           // <1 zooms the camera out (boss arena gets a wide cinematic view)
 
@@ -728,8 +728,8 @@ const Game = {
   setupCombat() {
     const groundY = this.height - 80;
     const trackEnd = this.levels[this.levels.length - 1].x + 400;
-    const racketX = 3600; // a bit later — karate carries the first stretch
-    const ballsX = 8250; // just past Wedding (x=8000)
+    const racketX = 3800; // a bit into the first stretch (karate carries the way in)
+    const ballsX = 20250; // ~just past Wedding (x=20000) — splits ground/flying foes
     this.racketX = racketX;
     this.ballsX = ballsX;
 
@@ -783,8 +783,9 @@ const Game = {
     // hit height: with a karate chop you must connect near the very top of a jump
     // (short vertical reach = tricky), but the racket's taller reach clips them
     // easily — so they showcase the karate->racket upgrade. They don't shoot.
+    // A couple of non-shooting wasps BEFORE the racket (karate practice).
     let wx = 1750, wi = 0;
-    while (wx < ballsX - 200) {
+    while (wx < racketX - 100) {
       if (!nearMilestone(wx) && !nearPickup(wx)) {
         this.enemies.push({
           type: 'flying', kind: 'wasp',
@@ -798,13 +799,13 @@ const Game = {
       wx += 1450;
     }
 
-    // Flying enemies in the latter half — alternate normal height and very-high.
-    // Normal ones are jump/racket reachable; the very-high ones float ABOVE melee
-    // reach, so the only way to defeat them is to whack their projectiles back.
-    // (No trampolines here — those are reserved for the high-heart pads.)
-    let fx = ballsX + 340;
+    // Projectile-throwing flying enemies — they kick in a bit AFTER the racket is
+    // grabbed (so you have the tool to whack shots back) and run dense the rest of
+    // the way. They alternate normal height (jump/racket reachable) and very-high
+    // (above melee reach — beat them ONLY by returning their projectiles).
+    let fx = racketX + 700;
     while (fx < trackEnd - 200 && fx < this.bossArenaStart - 250) {
-      if (!nearMilestone(fx)) {
+      if (!nearMilestone(fx) && !nearPickup(fx)) {
         const section = this.getLevelIndexAtX(fx);
         const high = fi % 2 === 1;
         const baseY = high ? 150 : 290; // 150 = out of melee reach (whack-back only)
@@ -815,12 +816,11 @@ const Game = {
           alive: true, dir: -1, range: 70, hitFlash: 0,
           frame: (fi * 13) % 60, section, high, heart: null,
           tier, hp: tier, maxHp: tier, lastSwingHit: -1,
-          // High foes shoot more often so you always have a projectile to return
-          shootTimer: 50 + Math.floor(Math.random() * (high ? 70 : 120))
+          shootTimer: 50 + Math.floor(Math.random() * (high ? 70 : 110))
         });
         fi++;
       }
-      fx += 760 - 280 * progress(fx); // ~620 -> ~480 late
+      fx += 1400 - 350 * progress(fx); // dense enough for ~25 shooters across the long road
     }
 
     // Memories are now read by walking through them, so any enemy that landed
@@ -866,10 +866,10 @@ const Game = {
 
     // Trampoline-gated bonus hearts floating high above the path
     const highHeartXs = [];
-    for (let x = racketX + 760; x < ballsX - 300; x += 1650) {
+    for (let x = racketX + 760; x < ballsX - 300; x += 4200) {
       if (!nearMilestone(x) && !nearPickup(x)) highHeartXs.push(x);
     }
-    for (let x = ballsX + 1000; x < trackEnd - 300 && x < this.bossArenaStart - 250; x += 1650) {
+    for (let x = ballsX + 1000; x < trackEnd - 300 && x < this.bossArenaStart - 250; x += 4200) {
       if (!nearMilestone(x)) highHeartXs.push(x);
     }
     highHeartXs.forEach((x, i) => {
@@ -1889,7 +1889,7 @@ const Game = {
   startBossFight() {
     this.bossActive = true;
     this.boss = {
-      homeX: 16150, x: 16150,
+      homeX: 37830, x: 37830,
       baseY: 170, y: 90,
       w: 120, h: 120,
       hp: 12, maxHp: 12,
