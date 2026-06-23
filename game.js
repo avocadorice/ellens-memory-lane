@@ -2725,7 +2725,8 @@ const Game = {
     const horizon = this.height - 90;
     const items = [
       { id: 6, kind: 'goldengate', side: 0.5 },  // Preston
-      { id: 8, kind: 'taipei101', side: 0.6 }     // Blaire
+      { id: 8, kind: 'taipei101', side: 0.6 },    // Blaire
+      { id: 9, kind: 'elcapitan', side: 0.58 }    // RV Camping
     ];
     items.forEach(it => {
       const lvl = this.levels.find(l => l.id === it.id);
@@ -2737,17 +2738,31 @@ const Game = {
       const alpha = Math.max(0, Math.min(1, (2600 - Math.abs(dx)) / 1100));
       if (alpha <= 0.02) return;
       if (it.kind === 'goldengate') Assets.drawGoldenGate(this.ctx, screenX, horizon, alpha);
-      else Assets.drawTaipei101(this.ctx, screenX, horizon, alpha);
+      else if (it.kind === 'taipei101') Assets.drawTaipei101(this.ctx, screenX, horizon, alpha);
+      else if (it.kind === 'elcapitan') Assets.drawElCapitan(this.ctx, screenX, horizon, alpha);
     });
   },
 
-  // A little plane crosses the sky on a loop (ambient throughout the journey).
+  // A plane crosses the sky (climbing at a gentle upward angle) — only around
+  // the 2nd-house chapter.
   drawBackgroundPlane() {
-    const period = 24000;
+    const lvl = this.levels.find(l => l.id === 7); // Moving to Our Second House
+    if (!lvl) return;
+    const dx = this.camera.x - (lvl.x - this.width / 3);
+    if (Math.abs(dx) > 2300) return;
+    const period = 15000;
     const t = (Date.now() % period) / period;
-    const x = -110 + t * (this.width + 220);
-    const y = 64 + Math.sin(t * Math.PI) * 8;
-    Assets.drawPlane(this.ctx, x, y, 1);
+    const x0 = -120, x1 = this.width + 120, y0 = 128, y1 = 34;
+    const x = x0 + t * (x1 - x0);
+    const y = y0 + t * (y1 - y0);
+    const ang = Math.atan2(y1 - y0, x1 - x0); // tilt the plane up to match the climb
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, (2300 - Math.abs(dx)) / 700)); // fade at the edges
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    Assets.drawPlane(ctx, 0, 0, 1);
+    ctx.restore();
   },
 
   // Renders the background scenery, hills and ground

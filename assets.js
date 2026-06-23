@@ -72,33 +72,106 @@ const Assets = {
     ctx.restore();
   },
 
-  // A little airliner with a contrail, drawn screen-space.
+  // El Capitan: a huge granite monolith with a sheer sunlit "Nose" face, a
+  // shadowed mass, fracture streaks and a pine base (for RV Camping / Yosemite).
+  drawElCapitan(ctx, x, baseY, alpha) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha)) * 0.92;
+    ctx.translate(x, baseY);
+    const light = '#a39fa8', dark = '#827e8a', crack = '#6c6876';
+    const h = 205, w = 165;
+    // shadowed left mass
+    ctx.fillStyle = dark;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.5, 0);
+    ctx.lineTo(-w * 0.42, -h * 0.6);
+    ctx.lineTo(-w * 0.1, -h * 0.98);
+    ctx.lineTo(w * 0.12, -h);
+    ctx.lineTo(w * 0.12, 0);
+    ctx.closePath();
+    ctx.fill();
+    // sunlit sheer face (the Nose) on the right
+    ctx.fillStyle = light;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.12, -h);
+    ctx.lineTo(w * 0.45, -h * 0.82);
+    ctx.lineTo(w * 0.5, -h * 0.2);
+    ctx.lineTo(w * 0.42, 0);
+    ctx.lineTo(w * 0.12, 0);
+    ctx.closePath();
+    ctx.fill();
+    // vertical fracture streaks
+    ctx.strokeStyle = crack;
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      const fx = w * 0.16 + i * (w * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(fx, -h * (0.75 - i * 0.04));
+      ctx.lineTo(fx + 2, -h * 0.05);
+      ctx.stroke();
+    }
+    // pine forest at the base
+    ctx.fillStyle = '#28401f';
+    for (let bx = -w * 0.5; bx < w * 0.5; bx += 10) {
+      ctx.beginPath();
+      ctx.moveTo(bx, 2);
+      ctx.lineTo(bx + 5, -11);
+      ctx.lineTo(bx + 10, 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  // A side-view airliner with a contrail (drawn nose-right; flip with dir).
   drawPlane(ctx, x, y, dir) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir, 1);
-    // contrail
-    const grad = ctx.createLinearGradient(-90, 0, 0, 0);
+
+    // contrail streaming from the tail
+    const grad = ctx.createLinearGradient(-120, 0, -16, 0);
     grad.addColorStop(0, 'rgba(255,255,255,0)');
-    grad.addColorStop(1, 'rgba(255,255,255,0.55)');
+    grad.addColorStop(1, 'rgba(255,255,255,0.5)');
     ctx.strokeStyle = grad;
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(-90, 1); ctx.lineTo(-6, 1); ctx.stroke();
-    // fuselage
+    ctx.beginPath(); ctx.moveTo(-120, 1); ctx.lineTo(-16, 1); ctx.stroke();
+
+    // swept main wing (behind fuselage)
+    ctx.fillStyle = '#aeb9c6';
+    ctx.beginPath();
+    ctx.moveTo(3, 1); ctx.lineTo(-13, 8); ctx.lineTo(-3, 1); ctx.closePath();
+    ctx.fill();
+
+    // swept vertical tail fin
+    ctx.fillStyle = '#cdd6e0';
+    ctx.beginPath();
+    ctx.moveTo(-12, 0); ctx.lineTo(-20, -11); ctx.lineTo(-10, -1); ctx.closePath();
+    ctx.fill();
+
+    // slender fuselage — pointed nose (right), tapering tail (left)
     ctx.fillStyle = '#eef2f6';
     ctx.beginPath();
-    ctx.ellipse(0, 0, 11, 3.4, 0, 0, Math.PI * 2);
+    ctx.moveTo(18, 0);
+    ctx.quadraticCurveTo(14, -3.4, 4, -3.6);
+    ctx.lineTo(-15, -1.8);
+    ctx.lineTo(-17, 0);
+    ctx.lineTo(-15, 1.8);
+    ctx.lineTo(4, 3.6);
+    ctx.quadraticCurveTo(14, 3.4, 18, 0);
+    ctx.closePath();
     ctx.fill();
-    // wing + tail
-    ctx.fillStyle = '#cfd8e2';
+
+    // cockpit + cabin windows
+    ctx.fillStyle = '#6f9cc4';
     ctx.beginPath();
-    ctx.moveTo(1, 0); ctx.lineTo(-5, 6); ctx.lineTo(-1, 0); ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(-9, -1); ctx.lineTo(-13, -6); ctx.lineTo(-8, -1); ctx.closePath(); ctx.fill();
-    // nose
-    ctx.fillStyle = '#9fb0c2';
-    ctx.beginPath(); ctx.arc(10, 0, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.moveTo(15, -1.1); ctx.lineTo(11, -2.3); ctx.lineTo(11, -0.6); ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(111,156,196,0.6)';
+    for (let i = 0; i < 6; i++) ctx.fillRect(7 - i * 3, -1.2, 1.4, 1.3);
+
     ctx.restore();
   },
 
