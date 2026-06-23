@@ -3472,26 +3472,15 @@ const Game = {
   drawHUD() {
     // (Heart collect-'em-all counter removed — hearts are now Zelda-style health.)
 
-    // Current Year Indicator in top center
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    this.ctx.fillRect(this.width / 2 - 60, 20, 120, 30);
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    this.ctx.strokeRect(this.width / 2 - 60, 20, 120, 30);
-
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '600 15px Outfit';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(this.getDisplayYear(this.player.x), this.width / 2, 41);
-
-    // --- Health: a row of Zelda-style hearts ---
-    const heartSize = 17, heartGap = 21, hRowX = 44, hRowY = 70;
+    // --- Health: a row of Zelda-style hearts, pinned to the very top-left ---
+    const heartSize = 16, heartGap = 20, hRowX = 22, hRowY = 26;
     for (let i = 0; i < this.player.maxHealth; i++) {
       this.drawHeartIcon(hRowX + i * heartGap, hRowY, heartSize, i < this.player.health);
     }
 
-    // --- Weapon badge --- (positioned just below the heart row)
+    // --- Weapon badge --- (just below the heart row, top-left)
     {
-      const hbX = 42, hbY = 80;
+      const hbX = 18, hbY = 40;
       let wName = 'Racket';
       let wIcon = '🎾';
       let wWidth = 86;
