@@ -626,6 +626,7 @@ const Game = {
     this.pickups = [];
     this.trampolines = [];
     this.poofs = [];
+    this.confetti = [];
     this.banner = null;
     this.boss = null;
     this.bossActive = false;
@@ -2375,6 +2376,9 @@ const Game = {
       this.poofs.forEach(pf => pf.progress += 0.08);
       this.poofs = this.poofs.filter(pf => pf.progress < 1);
     }
+
+    // --- Wedding confetti ---
+    this.updateConfetti();
   },
 
   triggerGameOver() {
@@ -2561,6 +2565,11 @@ const Game = {
   triggerMilestone(lvlIndex) {
     this.currentLevelIndex = lvlIndex;
 
+    // Crossing the wedding altar (id 4) sets off a celebratory confetti burst.
+    if (this.levels[lvlIndex].id === 4) {
+      this.startConfetti(this.levels[lvlIndex].x);
+    }
+
     // Earlier memories no longer freeze the game — their story is revealed as a
     // floating banner that advances with Ellen's position (see drawStoryBanner),
     // so she can stroll through (or back over) the words at her own pace. Only
@@ -2696,6 +2705,60 @@ const Game = {
       this._heartCache[key] = cv;
     }
     this.ctx.drawImage(cv, Math.round(cx - cv.width / 2), Math.round(cy - cv.height / 2));
+  },
+
+  // --- Wedding confetti: a one-off celebratory burst at the altar ---
+  startConfetti(worldX) {
+    if (!this.confetti) this.confetti = [];
+    const groundY = this.height - 80;
+    const colors = ['#ff6b9d', '#ffd166', '#06d6a0', '#118ab2', '#ef476f', '#ffffff', '#c77dff', '#ffd6e0'];
+    for (let i = 0; i < 90; i++) {
+      this.confetti.push({
+        x: worldX + (Math.random() - 0.5) * 170,
+        y: groundY - 70 - Math.random() * 70,
+        vx: (Math.random() - 0.5) * 6,
+        vy: -4 - Math.random() * 6,            // burst upward
+        w: 4 + Math.random() * 4,
+        h: 6 + Math.random() * 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * Math.PI * 2,
+        vrot: (Math.random() - 0.5) * 0.35,
+        sway: Math.random() * Math.PI * 2,
+        life: 150 + Math.random() * 90
+      });
+    }
+  },
+
+  updateConfetti() {
+    if (!this.confetti || !this.confetti.length) return;
+    const groundY = this.height - 80;
+    this.confetti.forEach(p => {
+      p.vy += 0.14;       // gravity
+      p.vx *= 0.99;
+      p.sway += 0.12;
+      p.x += p.vx + Math.sin(p.sway) * 0.7;   // flutter
+      p.y += p.vy;
+      p.rot += p.vrot;
+      p.life--;
+      if (p.y > groundY + 8) { p.y = groundY + 8; p.vy *= -0.25; p.vx *= 0.6; }
+    });
+    this.confetti = this.confetti.filter(p => p.life > 0);
+  },
+
+  drawConfetti(camX) {
+    if (!this.confetti || !this.confetti.length) return;
+    const ctx = this.ctx;
+    this.confetti.forEach(p => {
+      const rx = p.x - camX;
+      if (rx < -20 || rx > this.width + 20) return;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, p.life / 45);
+      ctx.translate(rx, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
   },
 
   // Renders the background scenery, hills and ground
@@ -3216,6 +3279,9 @@ const Game = {
       const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
       Assets.drawSoccerBall(this.ctx, pX + this.player.dir * 16, this.player.y - 6 - bob, Date.now() * 0.02);
     }
+
+    // Wedding confetti rains over everything
+    this.drawConfetti(camX);
 
     // HUD is drawn by the main loop (outside the zoom transform), not here.
   },
