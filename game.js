@@ -1793,7 +1793,9 @@ const Game = {
       const who = this.soccerQueue[0];
       const baseX = (this.soccerPos && this.soccerPos[who] != null) ? this.soccerPos[who] : this.player.x;
       spawnX = baseX + dir * 16;
-      spawnY = (this.height - 80) - 18;
+      // The front kicker follows the player's jump (formation draws it at
+      // player.y), so launch the ball from there — not the ground.
+      spawnY = this.player.y - 18;
       if (this.hopTimers && who !== 'player') this.hopTimers[who] = 15; // kick hop
       // Rotate the circular queue: the kicker moves to the back.
       this.soccerQueue.push(this.soccerQueue.shift());
