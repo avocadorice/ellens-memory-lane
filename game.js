@@ -719,6 +719,16 @@ const Game = {
     placeWeaponPickup(racketX, 'racket');
     placeWeaponPickup(this.soccerStart + 120, 'soccer');
 
+    // A lingering how-to hint by the racket — like the start hints, it fades in
+    // as she nears it and can be re-read by walking back. Only shows once she's
+    // actually grabbed the racket.
+    this.tutorialHints.push({
+      x: racketX + 55,
+      title: 'Hit the shots back! 🎾',
+      sub: 'Time a racket swing to return enemy projectiles',
+      needWeapon: 'racket'
+    });
+
     const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
     const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150;
 
@@ -2070,7 +2080,7 @@ const Game = {
           this.player.weapon = 'racket';
           this.banner = {
             timer: 240,
-            text: '🎾 Tennis racket! Longer reach than your karate chop — swing at the monsters'
+            text: '🎾 Tennis racket! Try to hit the enemy projectiles back at them'
           };
         } else if (pk.kind === 'soccer') {
           this.player.hasSoccer = true;
@@ -2903,11 +2913,12 @@ const Game = {
   // Floating control hints that fade in/out as Ellen walks past them.
   drawTutorialHints() {
     if (!this.tutorialHints) return;
-    if (this.player.x > 1450) return; // all hints are near the start; skip later
 
     const ctx = this.ctx;
     const range = 230; // px window over which a hint fades in/out
     this.tutorialHints.forEach(hint => {
+      // Some hints only apply once a tool is in hand (e.g. the racket how-to).
+      if (hint.needWeapon && this.player.weapon !== hint.needWeapon) return;
       const dist = Math.abs(this.player.x - hint.x);
       if (dist >= range) return;
       const alpha = 1 - dist / range;
