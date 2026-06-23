@@ -61,6 +61,10 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // Allow remote inspection of the WebView over adb (chrome://inspect / CDP),
+        // so the game's real on-device FPS can be profiled.
+        WebView.setWebContentsDebuggingEnabled(true)
+
         webView = WebView(this).apply {
             setBackgroundColor(0xFF000000.toInt())
             isFocusable = true
@@ -138,6 +142,13 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
             val action = obj.getString("action") // "keydown" | "keyup"
             if (action != "keydown" && action != "keyup") return
             val key = obj.getString("key")
+
+            // "Back" from the phone = exit the game, same as the remote's Back
+            // button (sends the app to the background → Google TV home).
+            if (key == "back") {
+                if (action == "keydown") runOnUiThread { @Suppress("DEPRECATION") onBackPressed() }
+                return
+            }
 
             // Two button vocabularies are accepted: our own (jump/chop) and the
             // ChillStick app's fixed labels (thrust/brake), mapped to the same
