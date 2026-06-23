@@ -918,6 +918,16 @@ const Game = {
     document.getElementById('ending-screen').classList.remove('active');
     document.getElementById('chapter-menu-overlay').classList.remove('active');
 
+    // Teleporting away mid-boss-fight: tear it down so the arena wall + locked
+    // camera release (otherwise you get yanked straight back into the arena).
+    // bossDefeated stays false, so it re-triggers if you walk back in.
+    if (this.bossActive) {
+      this.bossActive = false;
+      this.boss = null;
+      this.enemyProjectiles = [];
+      this.viewZoom = 1;
+    }
+
     // Teleport player slightly to the left of the target milestone (lets them walk in)
     const lvl = this.levels[lvlIndex];
     const targetX = lvl.x - 160;
@@ -1116,12 +1126,38 @@ const Game = {
         const num = parseInt(code.replace('Digit', ''));
         let targetLvlIdx = num - 1;
         if (num === 0) targetLvlIdx = 9;
-        
+
         if (targetLvlIdx >= 0 && targetLvlIdx < this.levels.length) {
           this.teleportToLevel(targetLvlIdx);
           e.preventDefault();
           return;
         }
+      }
+
+      // '-' warps straight to the boss arena, soccer ball in hand, ready to fight.
+      if (code === 'Minus') {
+        const targetX = this.bossArenaStart - 70;
+        if (wasmExports) {
+          wasmExports.initPlayer(targetX, this.height - 80);
+          this.player.x = wasmExports.player_x.value;
+          this.player.y = wasmExports.player_y.value;
+          this.player.vx = 0; this.player.vy = 0;
+        } else {
+          this.player.x = targetX;
+        }
+        this.isPaused = false;
+        this.currentLevelIndex = this.levels.length - 2;
+        this.bossDefeated = false; this.bossActive = false; this.boss = null;
+        this.enemyProjectiles = []; this.viewZoom = 1;
+        this.player.hasSoccer = true; // arrive with the soccer ball
+        this.soccerQueue = ['player', 'husband', 'kid1', 'kid2', 'dog'];
+        this.soccerPos = {};
+        this.player.weapon = 'racket';
+        this.player.health = this.player.maxHealth;
+        this.player.isDead = false; this.player.invuln = 0; this.player.attackTimer = 0;
+        this.camera.x = this.player.x - this.width / 3;
+        e.preventDefault();
+        return;
       }
 
       if (code === 'Space' || code === 'KeyW' || code === 'ArrowUp') {
@@ -3174,6 +3210,9 @@ const Game = {
     // Echo the player's jump down the line (front follows it exactly, the rest
     // ripple a few frames behind — so jumping is visible again).
     const hist = this.player.yHistory || [];
+    // Flash the whole family while invulnerable after a hit — same damage
+    // feedback as Ellen's blink in karate/racket mode.
+    const blink = this.player.invuln > 0 && Math.floor(this.player.invuln / 4) % 2 === 0;
     if (this.soccerJogT > 0) this.soccerJogT--;
 
     q.forEach((id, i) => {
@@ -3190,6 +3229,7 @@ const Game = {
 
       const rx = this.soccerPos[id] - camX;
       if (rx < -70 || rx > this.width + 70) return;
+      if (blink) return; // flash out this frame while invulnerable
       if (id === 'player') {
         Assets.drawEllen(this.ctx, rx, drawY, this.player.outfit, frame, dir, 1, false);
       } else if (id === 'husband') {
@@ -3201,10 +3241,10 @@ const Game = {
       }
     });
 
-    // Dribble ball + name marker on the front kicker
+    // Dribble ball + name marker on the front kicker (also blinks while hit)
     const front = q[0];
     const fx = this.soccerPos[front];
-    if (fx != null) {
+    if (fx != null && !blink) {
       const frontY = groundY + (hist[0] || 0); // follow the jump
       const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
       Assets.drawSoccerBall(this.ctx, fx - camX + dir * 16, frontY - 6 - bob, Date.now() * 0.02);
