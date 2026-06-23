@@ -627,6 +627,9 @@ const Game = {
     this.trampolines = [];
     this.poofs = [];
     this.confetti = [];
+    this.balloons = [];
+    this.raindrops = [];
+    this.rainIntensity = 0;
     this.banner = null;
     this.boss = null;
     this.bossActive = false;
@@ -2337,6 +2340,10 @@ const Game = {
 
     // --- Wedding confetti ---
     this.updateConfetti();
+
+    // --- Engagement balloons + approaching-boss rain ---
+    this.updateBalloons();
+    this.updateRain();
   },
 
   triggerGameOver() {
@@ -2719,6 +2726,201 @@ const Game = {
     });
   },
 
+  // --- Engagement balloons: a gentle stream rises into the sky while she's at
+  // the proposal chapter (purely decorative). ---
+  updateBalloons() {
+    if (!this.balloons) this.balloons = [];
+    const eng = this.levels.find(l => l.id === 3); // The Engagement
+    if (eng && this.player) {
+      const dx = Math.abs(this.player.x - eng.x);
+      if (dx < 650 && this.balloons.length < 26 && Math.random() < 0.07) {
+        const colors = ['#ff6b9d', '#ffd166', '#06d6a0', '#4cc9f0', '#ef476f', '#c77dff', '#ff9e6d', '#ffffff'];
+        this.balloons.push({
+          x: eng.x + (Math.random() - 0.5) * 520,
+          y: this.height - 96,
+          vy: -(0.8 + Math.random() * 0.7),
+          r: 8 + Math.random() * 5,
+          color: colors[(Math.random() * colors.length) | 0],
+          sway: Math.random() * Math.PI * 2,
+          life: 460
+        });
+      }
+    }
+    if (this.balloons.length) {
+      this.balloons.forEach(b => {
+        b.y += b.vy;
+        b.sway += 0.035;
+        b.x += Math.sin(b.sway) * 0.6;
+        b.life--;
+      });
+      this.balloons = this.balloons.filter(b => b.life > 0 && b.y > -40);
+    }
+  },
+
+  drawBalloons(camX) {
+    if (!this.balloons || !this.balloons.length) return;
+    const ctx = this.ctx;
+    this.balloons.forEach(b => {
+      const rx = b.x - camX;
+      if (rx < -30 || rx > this.width + 30) return;
+      const aIn = Math.min(1, (460 - b.life) / 12);
+      const aOut = Math.min(1, b.life / 50);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(aIn, aOut));
+      // string
+      ctx.strokeStyle = 'rgba(120,110,90,0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(rx, b.y + b.r);
+      ctx.quadraticCurveTo(rx + Math.sin(b.sway) * 4, b.y + b.r + 12, rx + Math.sin(b.sway) * 2, b.y + b.r + 22);
+      ctx.stroke();
+      // body
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.ellipse(rx, b.y, b.r * 0.86, b.r, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // knot
+      ctx.beginPath();
+      ctx.moveTo(rx - 2, b.y + b.r); ctx.lineTo(rx + 2, b.y + b.r); ctx.lineTo(rx, b.y + b.r + 3);
+      ctx.closePath(); ctx.fill();
+      // highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(rx - b.r * 0.3, b.y - b.r * 0.35, b.r * 0.22, b.r * 0.32, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  },
+
+  // --- Ambient wildlife: a few mallards bobbing on little ponds (background,
+  // non-interactive) and a flock of birds drifting across the sky. ---
+  drawMallards(camX) {
+    const ctx = this.ctx;
+    const groundY = this.height - 84;
+    const spots = this._mallardSpots || (this._mallardSpots = [3100, 6400, 10300, 14200, 24600, 31200]);
+    const t = Date.now() * 0.004;
+    spots.forEach((sx, gi) => {
+      const baseRx = sx - camX;
+      if (baseRx < -120 || baseRx > this.width + 120) return;
+      // little pond
+      ctx.fillStyle = 'rgba(86,138,168,0.55)';
+      ctx.beginPath(); ctx.ellipse(baseRx + 18, groundY + 9, 48, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(185,212,230,0.22)';
+      ctx.beginPath(); ctx.ellipse(baseRx + 14, groundY + 6, 30, 4, 0, 0, Math.PI * 2); ctx.fill();
+      const n = 2 + (gi % 2);
+      for (let k = 0; k < n; k++) {
+        const rx = baseRx + k * 25 + (k % 2) * 5;
+        const bob = Math.sin(t * 1.3 + gi * 2 + k) * 2.0;
+        const wob = Math.sin(t * 0.7 + k) * 1.2;
+        this.drawMallard(ctx, rx + wob, groundY + 2 + bob, (gi + k) % 2 === 0 ? 1 : -1);
+      }
+    });
+  },
+
+  drawMallard(ctx, x, y, dir) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    // body
+    ctx.fillStyle = '#8a7355';
+    ctx.beginPath(); ctx.ellipse(0, 0, 9, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+    // tail
+    ctx.beginPath(); ctx.moveTo(-8, -1); ctx.lineTo(-13, -3); ctx.lineTo(-8, 2.5); ctx.closePath(); ctx.fill();
+    // lighter chest
+    ctx.fillStyle = '#a8916b';
+    ctx.beginPath(); ctx.ellipse(4, 1, 4.2, 4, 0, 0, Math.PI * 2); ctx.fill();
+    // neck + green head
+    ctx.fillStyle = '#2f6b3a';
+    ctx.fillRect(5.5, -6, 3, 5.5);
+    ctx.beginPath(); ctx.ellipse(8, -6, 3.6, 4, 0, 0, Math.PI * 2); ctx.fill();
+    // white collar
+    ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(5.5, -2.4); ctx.lineTo(9, -2.4); ctx.stroke();
+    // yellow bill
+    ctx.fillStyle = '#e3b23c';
+    ctx.beginPath(); ctx.moveTo(11, -6.4); ctx.lineTo(15, -5.3); ctx.lineTo(11, -4); ctx.closePath(); ctx.fill();
+    // eye
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(9.2, -6.6, 0.8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
+
+  drawBirds() {
+    if (this.rainIntensity > 0.4) return; // birds don't fly in the storm
+    const ctx = this.ctx;
+    const period = 34000;
+    const t = (Date.now() % period) / period;
+    const leadX = this.width + 80 - t * (this.width + 220); // drift right -> left
+    const leadY = 70 + Math.sin(t * Math.PI * 2) * 18;
+    const flock = [[0, 0], [-18, 8], [18, 8], [-36, 16], [36, 16], [-54, 24], [54, 24]];
+    const flap = Math.sin(Date.now() * 0.012);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(45,55,75,0.5)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    flock.forEach((o, i) => {
+      const bx = leadX + o[0];
+      const by = leadY + o[1] + Math.sin(Date.now() * 0.01 + i) * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(bx - 6, by + (flap > 0 ? -1 : 1));
+      ctx.quadraticCurveTo(bx, by - 3 - flap * 1.5, bx + 6, by + (flap > 0 ? -1 : 1));
+      ctx.stroke();
+    });
+    ctx.restore();
+  },
+
+  // --- Rain that builds as she nears the boss arena (none -> light -> heavy),
+  // then clears once the boss is beaten so Mt. Fuji rises into sunshine. ---
+  updateRain() {
+    if (!this.raindrops) this.raindrops = [];
+    let intensity = 0;
+    if (this.player && !this.bossDefeated) {
+      const rainStart = this.bossArenaStart - 2400;
+      const rainFull = this.bossArenaStart - 200;
+      intensity = (this.player.x - rainStart) / (rainFull - rainStart);
+      intensity = Math.max(0, Math.min(1, intensity));
+    }
+    this.rainIntensity += (intensity - this.rainIntensity) * 0.04; // smooth ramp
+    if (this.rainIntensity < 0.01) { this.rainIntensity = 0; this.raindrops.length = 0; return; }
+    const target = Math.floor(this.rainIntensity * 170);
+    while (this.raindrops.length < target) this.raindrops.push(this.makeRaindrop(true));
+    if (this.raindrops.length > target) this.raindrops.length = target;
+    const wind = 1.8;
+    this.raindrops.forEach(d => {
+      d.y += d.spd;
+      d.x += wind;
+      if (d.y > this.height + 10) Object.assign(d, this.makeRaindrop(false));
+      else if (d.x > this.width + 20) d.x = -20;
+    });
+  },
+
+  makeRaindrop(anywhere) {
+    return {
+      x: Math.random() * (this.width + 60) - 30,
+      y: anywhere ? Math.random() * this.height : -20 - Math.random() * 60,
+      len: 9 + Math.random() * 12,
+      spd: 11 + Math.random() * 7
+    };
+  },
+
+  drawRain() {
+    if (!this.rainIntensity || this.rainIntensity < 0.01) return;
+    const ctx = this.ctx;
+    ctx.save();
+    // stormy darkening that deepens with the rain
+    ctx.fillStyle = `rgba(40,48,66,${0.2 * this.rainIntensity})`;
+    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.strokeStyle = `rgba(190,205,230,${0.32 + 0.15 * this.rainIntensity})`;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    this.raindrops.forEach(d => {
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x + d.len * 0.2, d.y + d.len);
+    });
+    ctx.stroke();
+    ctx.restore();
+  },
+
   // Distant landmarks tied to a chapter, drawn with slow parallax + a haze fade
   // so they read as far away (Golden Gate near Preston, Taipei 101 near Blaire).
   drawBackgroundLandmarks(camX) {
@@ -2793,6 +2995,7 @@ const Game = {
     // Distant parallaxed landmarks (rise from behind the hills) + an ambient plane
     this.drawBackgroundLandmarks(this.camera.x);
     this.drawBackgroundPlane();
+    this.drawBirds(); // a flock drifting across the sky
 
     // Draw Parallax clouds & hills
     this.drawParallaxHills(lvlIdx);
@@ -2805,6 +3008,9 @@ const Game = {
         Assets.drawScenery(this.ctx, lvl.id, relativeX, Date.now() * 0.02);
       }
     });
+
+    // Engagement balloons drift up behind the foreground characters
+    this.drawBalloons(this.camera.x);
 
     // Storm shroud over Mt. Fuji — hides the mountain until the boss is beaten,
     // then slowly parts to reveal it as the reward.
@@ -3117,6 +3323,9 @@ const Game = {
     // Ground detail line
     this.ctx.fillStyle = 'rgba(0,0,0,0.08)';
     this.ctx.fillRect(-this.width, this.height - 80, this.width * 3, 6);
+
+    // Background wildlife (mallards bobbing on little ponds — non-interactive)
+    this.drawMallards(camX);
 
     // Draw obstacles (hurdles)
     this.hurdles.forEach(hurdle => {
@@ -3684,6 +3893,7 @@ const Game = {
     this.drawBackground();
     this.drawForeground();
     if (zooming) this.ctx.restore();
+    this.drawRain(); // screen-space storm overlay, on top of the world but under the HUD
     this.drawHUD();
 
     // If game ended, run fireworks
