@@ -673,33 +673,8 @@ const Game = {
       });
 
       if (!nearMilestone) {
-        // Sparse healing hearts — Zelda-style, each heals 1. Far fewer now that
-        // they're heals (not collect-'em-all collectibles).
-        if (Math.random() < 0.14) {
-          const baseY = this.height - 130 - Math.random() * 60;
-          const heart = {
-            x: x,
-            y: baseY,
-            width: 16,
-            height: 16,
-            collected: false,
-            spawned: true,
-            fromEnemy: false,
-            falling: false,
-            section: this.getLevelIndexAtX(x)
-          };
-          // ~35% drift side-to-side so a straight vertical jump won't catch them.
-          if (Math.random() < 0.35) {
-            heart.motion = {
-              baseX: x, baseY,
-              ampX: 32, ampY: 12,
-              speed: 0.045, phase: Math.random() * Math.PI * 2
-            };
-          }
-          this.hearts.push(heart);
-        }
-
-        // Chance of obstacle hurdle below it
+        // (No hearts lie around the world — hearts now drop from defeated foes,
+        //  see defeatEnemy.) Chance of an obstacle hurdle here.
         if (Math.random() > 0.4) {
           // Use the milestone's scene id (not its position) so hurdle art matches scenery
           const activeLvl = this.levels[this.getLevelIndexAtX(x)].id;
@@ -865,43 +840,11 @@ const Game = {
       gi++; si++;
     }
 
-    // Trampoline-gated bonus hearts floating high above the path
-    const highHeartXs = [];
-    for (let x = racketX + 760; x < ballsX - 300; x += 4200) {
-      if (!nearMilestone(x) && !nearPickup(x)) highHeartXs.push(x);
-    }
-    for (let x = ballsX + 1000; x < trackEnd - 300 && x < this.bossArenaStart - 250; x += 4200) {
-      if (!nearMilestone(x)) highHeartXs.push(x);
-    }
-    highHeartXs.forEach((x, i) => {
-      // Heart floats high AND off to one side of the pad, drifting back and
-      // forth — she must trampoline-bounce then steer forward to grab it.
-      const dir = (i % 2 === 0) ? 1 : -1;
-      const heartBaseX = x + dir * 38;
-      this.hearts.push({
-        x: heartBaseX, y: 150, width: 16, height: 16, collected: false,
-        spawned: true, fromEnemy: false, falling: false, section: this.getLevelIndexAtX(x),
-        motion: {
-          baseX: heartBaseX, baseY: 150,
-          ampX: 28, ampY: 16,
-          speed: 0.04, phase: Math.random() * Math.PI * 2
-        }
-      });
-      if (!this.trampolines.some(t => Math.abs(t.x - x) < 40)) {
-        this.trampolines.push({ x, y: groundY, w: 58, squash: 0 });
-      }
-    });
+    // (Trampoline-gated bonus hearts removed — hearts only drop from foes now.
+    //  The weapon pickups keep their own trampolines.)
 
-    // Only some enemies drop a healing heart on defeat (keeps hearts scarce).
-    this.enemies.forEach(e => {
-      if (Math.random() >= 0.3) return;
-      const h = {
-        x: e.x, y: e.baseY, width: 16, height: 16, collected: false,
-        spawned: false, fromEnemy: true, falling: false, section: e.section
-      };
-      e.heart = h;
-      this.hearts.push(h);
-    });
+    // Hearts are no longer pre-placed on enemies — defeatEnemy rolls a
+    // health-scaled drop chance at the moment a foe is beaten.
   },
 
   preloadPhotos() {
@@ -1874,13 +1817,18 @@ const Game = {
     e.hitFlash = 0;
     this.poofs.push({ x: e.x, y: e.y, progress: 0 });
     AudioEngine.playEnemyDefeatSFX();
-    // Drop its heart (pops up, then falls to the ground)
-    if (e.heart && !e.heart.collected) {
-      e.heart.spawned = true;
-      e.heart.falling = true;
-      e.heart.x = e.x;
-      e.heart.y = e.y;
-      e.heart.vy = -5;
+
+    // Health-scaled heart drop (no hearts lie around the world anymore): the
+    // lower her health, the likelier a defeated foe drops a heart — so heals
+    // show up when she actually needs them.
+    const frac = this.player.maxHealth > 0 ? this.player.health / this.player.maxHealth : 1;
+    const dropChance = 0.08 + (1 - frac) * 0.55; // ~8% at full HP, ~52% at 1 heart
+    if (Math.random() < dropChance) {
+      this.hearts.push({
+        x: e.x, y: e.y, width: 16, height: 16,
+        collected: false, spawned: true, fromEnemy: true, falling: true,
+        vy: -5, section: e.section
+      });
     }
   },
 
