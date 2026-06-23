@@ -1728,12 +1728,14 @@ const Game = {
         const dist = Math.hypot((this.player.x - 5) - heart.x, (this.player.y - 35) - heart.y);
         const isColliding = dist < 38;
 
-        // A heart heals 1 — but only grab it when she actually needs it, so a
-        // scarce heart isn't wasted at full health (it lingers until hurt).
-        if (isColliding && this.player.health < this.player.maxHealth) {
+        // Touching a heart always collects it (it disappears); it heals 1 only
+        // if she's hurt — at full health it just vanishes with no effect.
+        if (isColliding) {
           heart.collected = true;
-          this.player.health += 1;
-          AudioEngine.playHeartSFX();
+          if (this.player.health < this.player.maxHealth) {
+            this.player.health += 1;
+            AudioEngine.playHeartSFX();
+          }
         }
       }
     });
