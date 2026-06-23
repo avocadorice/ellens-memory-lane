@@ -672,29 +672,31 @@ const Game = {
       });
 
       if (!nearMilestone) {
-        // Collectible heart
-        const baseY = this.height - 130 - Math.random() * 60;
-        const heart = {
-          x: x,
-          y: baseY,
-          width: 16,
-          height: 16,
-          collected: false,
-          spawned: true,
-          fromEnemy: false,
-          falling: false,
-          section: this.getLevelIndexAtX(x)
-        };
-        // ~35% of hearts drift side-to-side so a straight vertical jump won't
-        // catch them — she has to jump AND move into the heart.
-        if (Math.random() < 0.35) {
-          heart.motion = {
-            baseX: x, baseY,
-            ampX: 32, ampY: 12,
-            speed: 0.045, phase: Math.random() * Math.PI * 2
+        // Sparse healing hearts — Zelda-style, each heals 1. Far fewer now that
+        // they're heals (not collect-'em-all collectibles).
+        if (Math.random() < 0.14) {
+          const baseY = this.height - 130 - Math.random() * 60;
+          const heart = {
+            x: x,
+            y: baseY,
+            width: 16,
+            height: 16,
+            collected: false,
+            spawned: true,
+            fromEnemy: false,
+            falling: false,
+            section: this.getLevelIndexAtX(x)
           };
+          // ~35% drift side-to-side so a straight vertical jump won't catch them.
+          if (Math.random() < 0.35) {
+            heart.motion = {
+              baseX: x, baseY,
+              ampX: 32, ampY: 12,
+              speed: 0.045, phase: Math.random() * Math.PI * 2
+            };
+          }
+          this.hearts.push(heart);
         }
-        this.hearts.push(heart);
 
         // Chance of obstacle hurdle below it
         if (Math.random() > 0.4) {
@@ -731,10 +733,15 @@ const Game = {
     this.racketX = racketX;
     this.ballsX = ballsX;
 
-    // Pickups: tennis racket + the soccer ball (grants the family-soccer kick at
-    // the start of the gauntlet).
-    this.pickups.push({ x: racketX, y: groundY, kind: 'racket', collected: false, frame: 0 });
-    this.pickups.push({ x: this.soccerStart + 80, y: groundY, kind: 'soccer', collected: false, frame: 0 });
+    // Weapon pickups (racket + soccer ball) float high above a trampoline, set
+    // forward of the pad — so you must bounce AND carry momentum into them at an
+    // angle, not grab them with a straight jump.
+    const placeWeaponPickup = (padX, kind) => {
+      this.pickups.push({ x: padX + 55, y: 155, kind, collected: false, frame: 0 });
+      this.trampolines.push({ x: padX, y: groundY, w: 58, squash: 0 });
+    };
+    placeWeaponPickup(racketX, 'racket');
+    placeWeaponPickup(this.soccerStart + 120, 'soccer');
 
     const nearMilestone = (x) => this.levels.some(l => Math.abs(x - l.x) < 110);
     const nearPickup = (x) => Math.abs(x - racketX) < 150 || Math.abs(x - ballsX) < 150;
@@ -884,8 +891,9 @@ const Game = {
       }
     });
 
-    // Each enemy carries a heart that drops on defeat (counts toward the total)
+    // Only some enemies drop a healing heart on defeat (keeps hearts scarce).
     this.enemies.forEach(e => {
+      if (Math.random() >= 0.3) return;
       const h = {
         x: e.x, y: e.baseY, width: 16, height: 16, collected: false,
         spawned: false, fromEnemy: true, falling: false, section: e.section
@@ -1720,18 +1728,12 @@ const Game = {
         const dist = Math.hypot((this.player.x - 5) - heart.x, (this.player.y - 35) - heart.y);
         const isColliding = dist < 38;
 
-        if (isColliding) {
+        // A heart heals 1 — but only grab it when she actually needs it, so a
+        // scarce heart isn't wasted at full health (it lingers until hurt).
+        if (isColliding && this.player.health < this.player.maxHealth) {
           heart.collected = true;
-          this.heartsCollected++;
-          this.updateHeartsUI();
+          this.player.health += 1;
           AudioEngine.playHeartSFX();
-
-          // If she's backtracking after the finish and just grabbed the last
-          // heart, reward the secret prize right away.
-          if (this.allowSecretOnCollect && this.totalHearts > 0 && this.heartsCollected >= this.totalHearts) {
-            this.allowSecretOnCollect = false;
-            this.showSecretPrize();
-          }
         }
       }
     });
@@ -2622,32 +2624,20 @@ const Game = {
     // Win sound chime
     AudioEngine.playWinSFX();
 
-    // Did she collect EVERY heart? That unlocks the secret prize.
-    const allHearts = this.totalHearts > 0 && this.heartsCollected >= this.totalHearts;
-
-    // Show ending UI overlay after a short delay
+    // Show the ending overlay after a short delay (no more collect-'em-all prize).
     setTimeout(() => {
-      if (allHearts) {
-        this.showSecretPrize();
-      } else {
-        const missing = this.totalHearts - this.heartsCollected;
-        const hint = document.getElementById('ending-hearts-hint');
-        if (hint) {
-          hint.textContent = `💗 You found ${this.heartsCollected} of ${this.totalHearts} hearts. Collect them ALL for a special secret prize — choose “Keep Exploring” to go back for the ${missing} you missed!`;
-        }
-        this.endingFocusIndex = 0;
-        document.getElementById('ending-screen').classList.add('active');
-        this.updateEndingFocus();
-      }
+      const hint = document.getElementById('ending-hearts-hint');
+      if (hint) hint.textContent = '';
+      this.endingFocusIndex = 0;
+      document.getElementById('ending-screen').classList.add('active');
+      this.updateEndingFocus();
     }, 1500);
   },
 
-  // Resume play after finishing so she can backtrack and collect missed hearts.
+  // Resume play after finishing so she can keep wandering the memories.
   continueExploring() {
     document.getElementById('ending-screen').classList.remove('active');
     this.isPaused = false;
-    // Now that she's finished, grabbing the final heart pops the secret prize.
-    this.allowSecretOnCollect = true;
     this.ensureLoop();
     this.canvas.focus();
   },
@@ -2672,6 +2662,33 @@ const Game = {
       const b = document.getElementById(id);
       if (b) b.classList.toggle('focused', i === (this.endingFocusIndex || 0));
     });
+  },
+
+  // A single HUD heart — filled red, or a hollow dark outline when empty.
+  drawHeartIcon(cx, cy, s, filled) {
+    const ctx = this.ctx;
+    const k = s * 0.5;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.beginPath();
+    ctx.moveTo(0, k * 0.7);
+    ctx.bezierCurveTo(k * 1.1, -k * 0.4, k * 0.55, -k * 1.1, 0, -k * 0.45);
+    ctx.bezierCurveTo(-k * 0.55, -k * 1.1, -k * 1.1, -k * 0.4, 0, k * 0.7);
+    ctx.closePath();
+    if (filled) {
+      ctx.fillStyle = '#ff4d6d';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#b3173b';
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.stroke();
+    }
+    ctx.restore();
   },
 
   // Renders the background scenery, hills and ground
@@ -3380,23 +3397,7 @@ const Game = {
   },
 
   drawHUD() {
-    // Collectible Heart bubble background
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    this.ctx.beginPath();
-    this.ctx.arc(60, 40, 20, Math.PI * 0.5, Math.PI * 1.5);
-    this.ctx.arc(120, 40, 20, Math.PI * 1.5, Math.PI * 0.5);
-    this.ctx.closePath();
-    this.ctx.fill();
-
-    // Heart Emoji
-    this.ctx.font = '16px Outfit';
-    this.ctx.fillText('💖', 48, 45);
-    
-    // Heart Text
-    this.ctx.font = '600 15px Outfit';
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(`${this.heartsCollected} / ${this.totalHearts}`, 76, 45);
+    // (Heart collect-'em-all counter removed — hearts are now Zelda-style health.)
 
     // Current Year Indicator in top center
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
@@ -3409,19 +3410,11 @@ const Game = {
     this.ctx.textAlign = 'center';
     this.ctx.fillText(this.getDisplayYear(this.player.x), this.width / 2, 41);
 
-    // --- Health bar (segmented) ---
-    const hbX = 42, hbY = 66, hbW = 116, hbH = 11;
-    this.ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    this.ctx.fillRect(hbX - 6, hbY - 5, hbW + 12, hbH + 10);
-    const segW = hbW / this.player.maxHealth;
+    // --- Health: a row of Zelda-style hearts ---
+    const heartSize = 17, heartGap = 21, hRowX = 44, hRowY = 70;
     for (let i = 0; i < this.player.maxHealth; i++) {
-      this.ctx.fillStyle = i < this.player.health ? '#ff4d6d' : 'rgba(255,255,255,0.18)';
-      this.ctx.fillRect(hbX + i * segW + 1, hbY, segW - 2, hbH);
+      this.drawHeartIcon(hRowX + i * heartGap, hRowY, heartSize, i < this.player.health);
     }
-    this.ctx.fillStyle = '#fff';
-    this.ctx.font = '700 9px Outfit';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText('HP', hbX - 4, hbY - 7);
 
     // --- Weapon badge ---
     {
