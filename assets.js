@@ -3,6 +3,105 @@ const Assets = {
   _cache: {},
   noOptimize: null,
 
+  // --- Distant background landmarks (hazy, parallaxed) ---------------------
+  // Taipei 101: a tapering tower of 8 flared tiers + pinnacle (for Blaire).
+  drawTaipei101(ctx, x, baseY, alpha) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha)) * 0.9;
+    ctx.translate(x, baseY);
+    const light = '#9bb4ce', dark = '#84a0bd'; // hazy distant blue-grey
+    // base pedestal
+    ctx.fillStyle = dark;
+    ctx.fillRect(-24, -58, 48, 58);
+    // 8 stacked tiers that flare outward at the top
+    const tierH = 19, wBot = 15, wTop = 19;
+    for (let i = 0; i < 8; i++) {
+      const ty = -58 - i * tierH;
+      ctx.fillStyle = i % 2 ? light : dark;
+      ctx.beginPath();
+      ctx.moveTo(-wBot, ty);
+      ctx.lineTo(wBot, ty);
+      ctx.lineTo(wTop, ty - tierH);
+      ctx.lineTo(-wTop, ty - tierH);
+      ctx.closePath();
+      ctx.fill();
+    }
+    const topY = -58 - 8 * tierH;
+    ctx.fillStyle = dark;
+    ctx.fillRect(-11, topY - 16, 22, 16);  // crown block
+    ctx.fillStyle = light;
+    ctx.fillRect(-2, topY - 52, 4, 36);    // spire
+    ctx.restore();
+  },
+
+  // Golden Gate Bridge: two orange towers, draped main cables + suspenders,
+  // and a deck (for Preston).
+  drawGoldenGate(ctx, x, baseY, alpha) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha)) * 0.92;
+    ctx.translate(x, baseY);
+    const orange = '#c25a44';            // hazy distant International Orange
+    const span = 250, towerTop = -150, deckY = -34, tx = span * 0.26;
+    ctx.lineCap = 'round';
+    // deck
+    ctx.strokeStyle = orange;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-span / 2, deckY); ctx.lineTo(span / 2, deckY); ctx.stroke();
+    // towers
+    [-tx, tx].forEach(t => {
+      ctx.fillStyle = orange;
+      ctx.fillRect(t - 4, towerTop, 8, deckY - towerTop + 4);
+      ctx.fillRect(t - 9, towerTop + 16, 18, 4);  // crossbeams
+      ctx.fillRect(t - 9, towerTop + 36, 18, 4);
+    });
+    // main cables: end -> tower top -> sag between towers -> tower top -> end
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-span / 2, deckY - 3);
+    ctx.quadraticCurveTo(-tx - 30, deckY - 12, -tx, towerTop);
+    ctx.quadraticCurveTo(0, deckY + 26, tx, towerTop);
+    ctx.quadraticCurveTo(tx + 30, deckY - 12, span / 2, deckY - 3);
+    ctx.stroke();
+    // vertical suspenders following the mid-span sag
+    ctx.lineWidth = 1;
+    for (let sx = -tx + 12; sx < tx; sx += 16) {
+      const u = (sx + tx) / (2 * tx);
+      const sag = towerTop + (1 - Math.sin(u * Math.PI)) * (deckY + 26 - towerTop);
+      ctx.beginPath(); ctx.moveTo(sx, sag); ctx.lineTo(sx, deckY); ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  // A little airliner with a contrail, drawn screen-space.
+  drawPlane(ctx, x, y, dir) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    // contrail
+    const grad = ctx.createLinearGradient(-90, 0, 0, 0);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(1, 'rgba(255,255,255,0.55)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-90, 1); ctx.lineTo(-6, 1); ctx.stroke();
+    // fuselage
+    ctx.fillStyle = '#eef2f6';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 11, 3.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // wing + tail
+    ctx.fillStyle = '#cfd8e2';
+    ctx.beginPath();
+    ctx.moveTo(1, 0); ctx.lineTo(-5, 6); ctx.lineTo(-1, 0); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-9, -1); ctx.lineTo(-13, -6); ctx.lineTo(-8, -1); ctx.closePath(); ctx.fill();
+    // nose
+    ctx.fillStyle = '#9fb0c2';
+    ctx.beginPath(); ctx.arc(10, 0, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
+
   checkOptimize() {
     if (this.noOptimize === null) {
       const urlParams = new URLSearchParams(window.location.search);

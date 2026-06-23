@@ -716,6 +716,49 @@ input:checked + .slider:before {
   margin: 4px 0 18px;
   line-height: 1.5;
 }
+.next-adventure {
+  margin: 18px 0 6px;
+}
+.next-adventure-q {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 1.05rem;
+  color: #fff;
+  opacity: 0.92;
+  margin-bottom: 14px;
+}
+.next-adventure-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.dest-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  padding: 10px 12px 8px;
+  font-size: 1.6rem;
+  text-align: center;
+  min-width: 82px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  animation: dest-float 3s ease-in-out infinite;
+}
+.dest-chip div {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  opacity: 0.88;
+  margin-top: 5px;
+  white-space: nowrap;
+}
+.dest-chip:nth-child(2) { animation-delay: 0.4s; }
+.dest-chip:nth-child(3) { animation-delay: 0.8s; }
+.dest-chip:nth-child(4) { animation-delay: 1.2s; }
+@keyframes dest-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
 .ending-btn-row {
   display: flex;
   gap: 14px;

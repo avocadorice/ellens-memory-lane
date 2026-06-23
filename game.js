@@ -2719,6 +2719,37 @@ const Game = {
     });
   },
 
+  // Distant landmarks tied to a chapter, drawn with slow parallax + a haze fade
+  // so they read as far away (Golden Gate near Preston, Taipei 101 near Blaire).
+  drawBackgroundLandmarks(camX) {
+    const horizon = this.height - 90;
+    const items = [
+      { id: 6, kind: 'goldengate', side: 0.5 },  // Preston
+      { id: 8, kind: 'taipei101', side: 0.6 }     // Blaire
+    ];
+    items.forEach(it => {
+      const lvl = this.levels.find(l => l.id === it.id);
+      if (!lvl) return;
+      const refCam = lvl.x - this.width / 3;       // camera when she's at the chapter
+      const dx = camX - refCam;
+      if (Math.abs(dx) > 2600) return;
+      const screenX = this.width * it.side - dx * 0.32; // slow scroll = distant
+      const alpha = Math.max(0, Math.min(1, (2600 - Math.abs(dx)) / 1100));
+      if (alpha <= 0.02) return;
+      if (it.kind === 'goldengate') Assets.drawGoldenGate(this.ctx, screenX, horizon, alpha);
+      else Assets.drawTaipei101(this.ctx, screenX, horizon, alpha);
+    });
+  },
+
+  // A little plane crosses the sky on a loop (ambient throughout the journey).
+  drawBackgroundPlane() {
+    const period = 24000;
+    const t = (Date.now() % period) / period;
+    const x = -110 + t * (this.width + 220);
+    const y = 64 + Math.sin(t * Math.PI) * 8;
+    Assets.drawPlane(this.ctx, x, y, 1);
+  },
+
   // Renders the background scenery, hills and ground
   drawBackground() {
     // Dynamic Sky Gradient
@@ -2743,6 +2774,10 @@ const Game = {
         this.ctx.fillRect(starX, starY, size, size);
       }
     }
+
+    // Distant parallaxed landmarks (rise from behind the hills) + an ambient plane
+    this.drawBackgroundLandmarks(this.camera.x);
+    this.drawBackgroundPlane();
 
     // Draw Parallax clouds & hills
     this.drawParallaxHills(lvlIdx);
