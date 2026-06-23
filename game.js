@@ -2666,31 +2666,36 @@ const Game = {
     });
   },
 
-  // A single HUD heart — filled red, or a hollow dark outline when empty.
+  // A single HUD heart — filled red, or a hollow dark outline when empty. The
+  // two states are rendered once into tiny offscreen canvases and then blitted,
+  // so we don't re-tessellate bezier paths every frame.
   drawHeartIcon(cx, cy, s, filled) {
-    const ctx = this.ctx;
-    const k = s * 0.5;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.beginPath();
-    ctx.moveTo(0, k * 0.7);
-    ctx.bezierCurveTo(k * 1.1, -k * 0.4, k * 0.55, -k * 1.1, 0, -k * 0.45);
-    ctx.bezierCurveTo(-k * 0.55, -k * 1.1, -k * 1.1, -k * 0.4, 0, k * 0.7);
-    ctx.closePath();
-    if (filled) {
-      ctx.fillStyle = '#ff4d6d';
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = '#b3173b';
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-      ctx.stroke();
+    if (!this._heartCache) this._heartCache = {};
+    const key = (filled ? 'f' : 'e') + s;
+    let cv = this._heartCache[key];
+    if (!cv) {
+      cv = document.createElement('canvas');
+      const pad = 4, dim = Math.ceil(s + pad * 2);
+      cv.width = dim;
+      cv.height = dim;
+      const c = cv.getContext('2d');
+      const k = s * 0.5;
+      c.translate(dim / 2, dim / 2 + 1);
+      c.beginPath();
+      c.moveTo(0, k * 0.7);
+      c.bezierCurveTo(k * 1.1, -k * 0.4, k * 0.55, -k * 1.1, 0, -k * 0.45);
+      c.bezierCurveTo(-k * 0.55, -k * 1.1, -k * 1.1, -k * 0.4, 0, k * 0.7);
+      c.closePath();
+      if (filled) {
+        c.fillStyle = '#ff4d6d'; c.fill();
+        c.lineWidth = 1.5; c.strokeStyle = '#b3173b'; c.stroke();
+      } else {
+        c.fillStyle = 'rgba(0,0,0,0.4)'; c.fill();
+        c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,255,255,0.5)'; c.stroke();
+      }
+      this._heartCache[key] = cv;
     }
-    ctx.restore();
+    this.ctx.drawImage(cv, Math.round(cx - cv.width / 2), Math.round(cy - cv.height / 2));
   },
 
   // Renders the background scenery, hills and ground
