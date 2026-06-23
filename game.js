@@ -3416,8 +3416,9 @@ const Game = {
       this.drawHeartIcon(hRowX + i * heartGap, hRowY, heartSize, i < this.player.health);
     }
 
-    // --- Weapon badge ---
+    // --- Weapon badge --- (positioned just below the heart row)
     {
+      const hbX = 42, hbY = 80;
       let wName = 'Racket';
       let wIcon = '🎾';
       let wWidth = 86;
