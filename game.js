@@ -1767,10 +1767,11 @@ const Game = {
   inSoccerZone() {
     return this.player.x >= this.soccerStart && this.player.x < this.bossArenaStart;
   },
-  // The soccer kick is available once she's picked up the ball and reached the
-  // gauntlet — and it carries on through the boss fight.
+  // The soccer kick is available the moment she picks up the soccer ball, and
+  // stays equipped for good — she keeps it even walking back (no reverting to
+  // the racket) and on through the boss fight.
   soccerActive() {
-    return this.player.hasSoccer && this.player.x >= this.soccerStart;
+    return this.player.hasSoccer;
   },
   // The full circular-queue line formation — runs in the gauntlet AND on into
   // the boss fight (the line still moves/jumps with the player, so she can dodge).
