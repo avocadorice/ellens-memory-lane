@@ -500,8 +500,8 @@ const Game = {
   boss: null,
   bossActive: false,    // fight in progress (invisible wall up)
   bossDefeated: false,  // beaten → Fuji photos reveal + path opens
-  bossArenaStart: 14820, // x where the fight begins (after the soccer gauntlet, before Fuji)
-  bossWallX: 15400,      // Ellen can roam the full arena up to here (just shy of Fuji)
+  bossArenaStart: 15520, // x where the fight begins (after the soccer gauntlet, before Fuji)
+  bossWallX: 16100,      // Ellen can roam the full arena up to here (just shy of Fuji)
   soccerStart: 13450,    // x where the family soccer gauntlet begins (after RV camping)
   fujiRevealProgress: 0, // 0 = Mt. Fuji shrouded in storm clouds, 1 = fully revealed
   viewZoom: 1,           // <1 zooms the camera out (boss arena gets a wide cinematic view)
@@ -837,17 +837,24 @@ const Game = {
       }
     });
 
-    // Soccer gauntlet: a line of ground foes to boot soccer balls at on the
-    // run-up to the boss. (Added after the relocation pass so they stay put.)
-    for (let sx = this.soccerStart + 240; sx < this.bossArenaStart - 220; sx += 300) {
+    // Soccer gauntlet → final showdown: a long, dense run of TOUGHER foes (she
+    // has the soccer ball now). Tier ramps 2 -> 3 as you near the boss, and a
+    // few aerial foes mix it up. (After the relocation pass so they stay put.)
+    let si = 0;
+    for (let sx = this.soccerStart + 220; sx < this.bossArenaStart - 160; sx += 200) {
+      const frac = (sx - this.soccerStart) / (this.bossArenaStart - this.soccerStart);
+      const tier = frac > 0.55 ? 3 : 2;        // meaner the closer you get
+      const flying = (si % 4 === 3);            // an occasional hovering foe
       this.enemies.push({
-        type: 'ground', kind: groundKinds[gi % groundKinds.length],
-        x: sx, homeX: sx, y: groundY - 14, baseY: groundY - 14,
-        alive: true, dir: -1, range: 38, hitFlash: 0,
+        type: flying ? 'flying' : 'ground',
+        kind: flying ? flyingKinds[si % flyingKinds.length] : groundKinds[gi % groundKinds.length],
+        x: sx, homeX: sx,
+        y: flying ? 250 : groundY - 14, baseY: flying ? 250 : groundY - 14,
+        alive: true, dir: -1, range: flying ? 46 : 40, hitFlash: 0,
         frame: (gi * 9) % 60, section: this.getLevelIndexAtX(sx), high: false, heart: null,
-        tier: 1, hp: 1, maxHp: 1, lastSwingHit: -1
+        tier, hp: tier, maxHp: tier, lastSwingHit: -1
       });
-      gi++;
+      gi++; si++;
     }
 
     // Trampoline-gated bonus hearts floating high above the path
@@ -1839,7 +1846,7 @@ const Game = {
   startBossFight() {
     this.bossActive = true;
     this.boss = {
-      homeX: 15450, x: 15450,
+      homeX: 16150, x: 16150,
       baseY: 170, y: 90,
       w: 120, h: 120,
       hp: 12, maxHp: 12,
