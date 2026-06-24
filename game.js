@@ -638,6 +638,119 @@ const Game = {
     this.viewZoom = 1;
     this.allowSecretOnCollect = false;
     this.endingFocusIndex = 0;
+
+    // --- Decorative fruit trees scattered throughout the world ----------------
+    const treeKinds = ['red_apple', 'green_apple', 'lemon', 'plum', 'pear'];
+    this.fruitTrees = [];
+    const walkLimitXTrees = this.levels[this.levels.length - 1].x;
+    for (let tx = 800; tx < walkLimitXTrees - 200; tx += 480 + ((tx * 7) % 320)) {
+      // Don't place trees right on top of milestone scenery
+      let tooClose = false;
+      this.levels.forEach(lvl => {
+        if (Math.abs(tx - lvl.x) < 160) tooClose = true;
+      });
+      if (tooClose) continue;
+      const kind = treeKinds[((tx * 13 + 7) >> 0) % treeKinds.length];
+      const scale = 0.75 + ((tx * 3) % 50) / 100;   // 0.75 – 1.25
+      const offsetX = ((tx * 11) % 80) - 40;         // jitter ±40px
+      this.fruitTrees.push({ x: tx + offsetX, kind, scale });
+    }
+
+    // --- Decorative crows / ravens -------------------------------------------
+    this.crows = [];
+    // Ground-hopping crows (pecking along the path)
+    const hopSpots = [1800, 4200, 7500, 10800, 14800, 18300, 21500, 25200, 28900, 33000];
+    hopSpots.forEach((sx, i) => {
+      const count = 1 + (i % 3);  // 1–3 crows per spot
+      for (let j = 0; j < count; j++) {
+        this.crows.push({
+          mode: 'hop',
+          baseX: sx + j * 32 + ((i * 17 + j * 41) % 24),
+          y: this.height - 78 + ((i + j) % 3) * 2,
+          dir: (i + j) % 2 === 0 ? 1 : -1,
+          hopSpeed: 0.3 + (j * 0.15),
+          hopPhase: (i * 2.1 + j * 1.3),
+          hopDrift: 0  // accumulated x drift from hopping
+        });
+      }
+    });
+    // Flying crows (soaring across the sky at various altitudes)
+    for (let i = 0; i < 12; i++) {
+      const startX = 1200 + i * 3100 + ((i * 137) % 600);
+      this.crows.push({
+        mode: 'fly',
+        baseX: startX,
+        y: 60 + ((i * 53) % 100),
+        dir: i % 3 === 0 ? -1 : 1,
+        flapPhase: i * 1.7,
+        flySpeed: 0.4 + ((i * 19) % 30) / 100,  // 0.4–0.7 px/frame
+        flyDrift: 0
+      });
+    }
+
+    // --- Decorative farm animals (non-interactive) ----------------------------
+    this.farmAnimals = [];
+
+    // Chicks — little flocks pecking around the ground
+    const chickSpots = [2400, 5200, 8800, 13200, 17000, 22000, 26000, 32500];
+    chickSpots.forEach((sx, i) => {
+      const count = 2 + (i % 3); // 2–4 chicks per flock
+      for (let j = 0; j < count; j++) {
+        this.farmAnimals.push({
+          type: 'chick',
+          x: sx + j * 18 + ((i * 13 + j * 29) % 20) - 10,
+          y: this.height - 74,
+          dir: (i + j) % 2 === 0 ? 1 : -1,
+          phase: i * 1.4 + j * 2.1
+        });
+      }
+    });
+
+    // Cows — grazing in small herds at pastoral spots
+    const cowSpots = [3600, 11000, 19000, 26500, 33500];
+    cowSpots.forEach((sx, i) => {
+      // Don't place cows on top of milestone scenery
+      let skip = false;
+      this.levels.forEach(lvl => { if (Math.abs(sx - lvl.x) < 250) skip = true; });
+      if (skip) return;
+      const count = 1 + (i % 2); // 1–2 cows per spot
+      for (let j = 0; j < count; j++) {
+        this.farmAnimals.push({
+          type: 'cow',
+          x: sx + j * 90 + ((i * 23) % 40),
+          y: this.height - 105,
+          dir: (i + j) % 2 === 0 ? 1 : -1,
+          phase: i * 0.8 + j * 3.2
+        });
+      }
+    });
+
+    // Horses — standing/grazing in meadows
+    const horseSpots = [6800, 15500, 24000, 31500];
+    horseSpots.forEach((sx, i) => {
+      let skip = false;
+      this.levels.forEach(lvl => { if (Math.abs(sx - lvl.x) < 250) skip = true; });
+      if (skip) return;
+      this.farmAnimals.push({
+        type: 'horse',
+        x: sx + ((i * 37) % 50),
+        y: this.height - 109,
+        dir: i % 2 === 0 ? 1 : -1,
+        phase: i * 2.3
+      });
+    });
+
+    // Owls — perched in trees, only in the nighttime zone (near Blaire & RV Camping, x ~29000–35500)
+    const owlSpots = [29200, 30200, 31400, 32600, 33800, 34800];
+    owlSpots.forEach((sx, i) => {
+      this.farmAnimals.push({
+        type: 'owl',
+        x: sx + ((i * 41) % 60) - 30,
+        y: this.height - 160 - ((i * 23) % 30), // perched high, varied heights
+        dir: i % 2 === 0 ? 1 : -1,
+        phase: i * 1.9
+      });
+    });
     this.heartsCollected = 0;
 
     // Reset player combat loadout
@@ -2344,6 +2457,8 @@ const Game = {
     // --- Engagement balloons + approaching-boss rain ---
     this.updateBalloons();
     this.updateRain();
+    this.updateCrows();
+    this.updateFarmAnimals();
   },
 
   triggerGameOver() {
@@ -2869,6 +2984,99 @@ const Game = {
     ctx.restore();
   },
 
+  // --- Decorative Fruit Trees (background scenery, non-interactive) ----------
+  drawFruitTrees(camX) {
+    if (!this.fruitTrees) return;
+    const groundY = this.height - 80;
+    const ctx = this.ctx;
+    this.fruitTrees.forEach(tree => {
+      const rx = tree.x - camX;
+      // Cull off-screen trees (generous margin for canopy width)
+      if (rx < -80 || rx > this.width + 80) return;
+      Assets.drawFruitTree(ctx, rx, groundY, tree.kind, tree.scale);
+    });
+  },
+
+  // --- Decorative Crows / Ravens (non-interactive wildlife) ------------------
+  // Flying crows soar across the sky; ground crows hop and peck.
+  updateCrows() {
+    if (!this.crows) return;
+    this.crows.forEach(c => {
+      if (c.mode === 'fly') {
+        c.flapPhase += 0.09;
+        c.flyDrift += c.dir * c.flySpeed;
+        // Wrap around so they reappear: drift range ±1200 around their home
+        if (Math.abs(c.flyDrift) > 1200) c.flyDrift = -c.flyDrift * 0.1;
+      } else {
+        // Hopping crows
+        c.hopPhase += 0.06 * c.hopSpeed;
+        // Small hops drift them a few px, then they reverse direction
+        const hopVal = Math.sin(c.hopPhase);
+        c.hopDrift += c.dir * Math.max(0, hopVal) * 0.3;
+        // Reverse direction periodically
+        if (Math.abs(c.hopDrift) > 45) {
+          c.dir *= -1;
+          c.hopDrift *= 0.8;
+        }
+      }
+    });
+  },
+
+  drawCrows(camX, modeFilter) {
+    if (!this.crows) return;
+    const ctx = this.ctx;
+    this.crows.forEach(c => {
+      if (modeFilter && c.mode !== modeFilter) return;
+      const worldX = c.baseX + (c.flyDrift || 0) + (c.hopDrift || 0);
+      const rx = worldX - camX;
+      if (rx < -40 || rx > this.width + 40) return;
+      // Flying crows hide during heavy rain (same as the V-flock)
+      if (c.mode === 'fly' && this.rainIntensity > 0.4) return;
+      const dy = c.mode === 'fly'
+        ? c.y + Math.sin(Date.now() * 0.002 + c.flapPhase) * 6  // gentle altitude bobbing
+        : c.y - Math.abs(Math.sin(c.hopPhase)) * 5;              // hop-bounce
+      Assets.drawCrow(ctx, rx, dy, c.dir, c.mode, c.flapPhase || 0, c.hopPhase || 0);
+    });
+  },
+
+  // --- Decorative Farm Animals (non-interactive wildlife) ---------------------
+  updateFarmAnimals() {
+    if (!this.farmAnimals) return;
+    this.farmAnimals.forEach(a => {
+      // Advance animation phase at different rates per animal type
+      switch (a.type) {
+        case 'chick': a.phase += 0.07; break;   // pecking
+        case 'cow':   a.phase += 0.02; break;   // slow tail swish
+        case 'horse': a.phase += 0.025; break;  // grazing head dip
+        case 'owl':   a.phase += 0.04; break;   // head bob + blink
+      }
+    });
+  },
+
+  drawFarmAnimals(camX) {
+    if (!this.farmAnimals) return;
+    const ctx = this.ctx;
+    this.farmAnimals.forEach(a => {
+      const rx = a.x - camX;
+      // Cull with generous margins (horses/cows are ~70px wide)
+      if (rx < -80 || rx > this.width + 80) return;
+      switch (a.type) {
+        case 'chick':
+          Assets.drawChick(ctx, rx, a.y, a.dir, a.phase);
+          break;
+        case 'cow':
+          Assets.drawCow(ctx, rx, a.y, a.dir, a.phase);
+          break;
+        case 'horse':
+          Assets.drawHorse(ctx, rx, a.y, a.dir, a.phase);
+          break;
+        case 'owl':
+          Assets.drawOwl(ctx, rx, a.y, a.dir, a.phase);
+          break;
+      }
+    });
+  },
+
   // --- Rain that builds as she nears the boss arena (none -> light -> heavy),
   // then clears once the boss is beaten so Mt. Fuji rises into sunshine. ---
   updateRain() {
@@ -2996,6 +3204,7 @@ const Game = {
     this.drawBackgroundLandmarks(this.camera.x);
     this.drawBackgroundPlane();
     this.drawBirds(); // a flock drifting across the sky
+    this.drawCrows(this.camera.x, 'fly'); // flying crows soaring across the sky
 
     // Draw Parallax clouds & hills
     this.drawParallaxHills(lvlIdx);
@@ -3326,6 +3535,15 @@ const Game = {
 
     // Background wildlife (mallards bobbing on little ponds — non-interactive)
     this.drawMallards(camX);
+
+    // Decorative fruit trees (behind hurdles/characters, on the ground)
+    this.drawFruitTrees(camX);
+
+    // Ground-hopping crows (pecking along the path — non-interactive)
+    this.drawCrows(camX, 'hop');
+
+    // Farm animals (chicks, cows, horses, owls — non-interactive)
+    this.drawFarmAnimals(camX);
 
     // Draw obstacles (hurdles)
     this.hurdles.forEach(hurdle => {

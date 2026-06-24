@@ -3592,5 +3592,596 @@ const Assets = {
       ctx.fill();
     }
     ctx.restore();
+  },
+
+  // --- Fruit Trees (purely decorative, scattered throughout the world) --------
+
+  // Generic fruit tree: trunk + leafy canopy + coloured fruit dots.
+  // `kind` selects the palette: 'red_apple','green_apple','lemon','plum','pear'
+  drawFruitTree(ctx, x, baseY, kind, scale) {
+    const s = scale || 1;
+    ctx.save();
+    ctx.translate(x, baseY);
+    ctx.scale(s, s);
+
+    // Palette per tree type
+    const palettes = {
+      red_apple:   { leaf: '#2d6e2e', leafHi: '#4a9e3f', fruit: '#d62828', fruitHi: '#ff5555', trunk: '#6b4226', trunkDk: '#4a2d14' },
+      green_apple: { leaf: '#3a7d44', leafHi: '#68b85e', fruit: '#7cb518', fruitHi: '#a2d149', trunk: '#7a5033', trunkDk: '#54331a' },
+      lemon:       { leaf: '#3e7a3e', leafHi: '#5ba85b', fruit: '#f5cb5c', fruitHi: '#fde68a', trunk: '#6b4226', trunkDk: '#4a2d14' },
+      plum:        { leaf: '#2b5e3a', leafHi: '#48874c', fruit: '#4361a8', fruitHi: '#6b8fd4', trunk: '#5e3a1f', trunkDk: '#3d220e' },
+      pear:        { leaf: '#3d7a3d', leafHi: '#5fa85f', fruit: '#e8c53e', fruitHi: '#f5e078', trunk: '#7a5033', trunkDk: '#54331a' }
+    };
+    const p = palettes[kind] || palettes.red_apple;
+
+    // Trunk
+    ctx.fillStyle = p.trunk;
+    ctx.beginPath();
+    ctx.moveTo(-6, 0);
+    ctx.lineTo(-8, -40);
+    ctx.quadraticCurveTo(-5, -52, 0, -58);
+    ctx.quadraticCurveTo(5, -52, 8, -40);
+    ctx.lineTo(6, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Trunk bark detail
+    ctx.fillStyle = p.trunkDk;
+    ctx.fillRect(-3, -35, 2, 18);
+    ctx.fillRect(2, -28, 1.5, 14);
+
+    // Branch stubs
+    ctx.strokeStyle = p.trunk;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-4, -38); ctx.lineTo(-18, -52);
+    ctx.moveTo(5, -42); ctx.lineTo(20, -54);
+    ctx.stroke();
+
+    // Leafy canopy (overlapping circles)
+    const canopyParts = [
+      { cx: 0, cy: -72, r: 26 },
+      { cx: -18, cy: -62, r: 20 },
+      { cx: 18, cy: -62, r: 20 },
+      { cx: -10, cy: -82, r: 18 },
+      { cx: 12, cy: -80, r: 17 },
+      { cx: 0, cy: -55, r: 16 }
+    ];
+    // Main canopy fill
+    ctx.fillStyle = p.leaf;
+    canopyParts.forEach(c => {
+      ctx.beginPath();
+      ctx.arc(c.cx, c.cy, c.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    // Highlight tops
+    ctx.fillStyle = p.leafHi;
+    canopyParts.forEach(c => {
+      ctx.beginPath();
+      ctx.arc(c.cx - 2, c.cy - 3, c.r * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Fruit dots (deterministic pseudo-random placement seeded by kind)
+    const seed = kind.charCodeAt(0) + kind.charCodeAt(kind.length - 1);
+    const fruitSpots = [];
+    for (let i = 0; i < 7; i++) {
+      const a = (seed * 17 + i * 131) % 360 * (Math.PI / 180);
+      const dist = 10 + ((seed * 7 + i * 43) % 14);
+      const fcx = Math.cos(a) * dist;
+      const fcy = -70 + Math.sin(a) * dist * 0.7;
+      fruitSpots.push({ x: fcx, y: fcy });
+    }
+    ctx.fillStyle = p.fruit;
+    fruitSpots.forEach(f => {
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.fillStyle = p.fruitHi;
+    fruitSpots.forEach(f => {
+      ctx.beginPath();
+      ctx.arc(f.x - 0.8, f.y - 0.8, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.restore();
+  },
+
+  // --- Crows / Ravens (non-interactive, purely visual) -----------------------
+
+  // A single crow. `mode` = 'fly' | 'hop'.
+  // `flapPhase` drives wing animation (radians, evolves over time).
+  // `hopPhase` drives the hop-bob when on the ground.
+  drawCrow(ctx, x, y, dir, mode, flapPhase, hopPhase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+
+    const isFlying = mode === 'fly';
+
+    // Body — sleek black oval
+    ctx.fillStyle = '#1a1a2e';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, isFlying ? 10 : 8, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Iridescent sheen
+    ctx.fillStyle = 'rgba(72, 60, 120, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(-1, -1.5, 6, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (isFlying) {
+      // Wings — flap with flapPhase
+      const wingAngle = Math.sin(flapPhase) * 0.65;
+      ctx.fillStyle = '#111128';
+      // Left wing
+      ctx.save();
+      ctx.translate(-4, -3);
+      ctx.rotate(-0.3 - wingAngle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(-8, -10, -16, -4);
+      ctx.quadraticCurveTo(-10, 2, 0, 0);
+      ctx.fill();
+      ctx.restore();
+      // Right wing
+      ctx.save();
+      ctx.translate(4, -3);
+      ctx.rotate(0.3 + wingAngle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(8, -10, 16, -4);
+      ctx.quadraticCurveTo(10, 2, 0, 0);
+      ctx.fill();
+      ctx.restore();
+
+      // Tail feathers — spread fan
+      ctx.fillStyle = '#0d0d1a';
+      ctx.beginPath();
+      ctx.moveTo(-8, 2);
+      ctx.lineTo(-15, 5);
+      ctx.lineTo(-12, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-8, 1);
+      ctx.lineTo(-16, 2);
+      ctx.lineTo(-11, -1);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // Folded wings on body
+      ctx.fillStyle = '#111128';
+      ctx.beginPath();
+      ctx.ellipse(-2, -1, 7, 4, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tail
+      ctx.fillStyle = '#0d0d1a';
+      ctx.beginPath();
+      ctx.moveTo(-7, 1);
+      ctx.lineTo(-14, 3);
+      ctx.lineTo(-13, -1);
+      ctx.lineTo(-7, -1);
+      ctx.closePath();
+      ctx.fill();
+
+      // Legs
+      const hopBob = Math.abs(Math.sin(hopPhase || 0)) * 3;
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-2, 5); ctx.lineTo(-3, 9 - hopBob);
+      ctx.moveTo(-3, 9 - hopBob); ctx.lineTo(-5, 10 - hopBob);
+      ctx.moveTo(-3, 9 - hopBob); ctx.lineTo(-1, 10 - hopBob);
+      ctx.moveTo(3, 5);  ctx.lineTo(4, 9 - hopBob);
+      ctx.moveTo(4, 9 - hopBob); ctx.lineTo(2, 10 - hopBob);
+      ctx.moveTo(4, 9 - hopBob); ctx.lineTo(6, 10 - hopBob);
+      ctx.stroke();
+    }
+
+    // Head
+    ctx.fillStyle = '#1a1a2e';
+    ctx.beginPath();
+    ctx.arc(9, -3, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Beak — thick black
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.moveTo(13, -4);
+    ctx.lineTo(18, -2.5);
+    ctx.lineTo(13, -1.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Eye — beady
+    ctx.fillStyle = '#e0e0e0';
+    ctx.beginPath();
+    ctx.arc(10.5, -4, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(10.8, -4, 0.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  },
+
+  // --- Farm Animals (non-interactive, purely decorative) ----------------------
+
+  // Baby chick: tiny round yellow body, orange beak, little legs.
+  // `peckPhase` (radians) drives a head-bob pecking animation.
+  drawChick(ctx, x, y, dir, peckPhase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    const peck = Math.max(0, Math.sin(peckPhase || 0)) * 3; // head dips down
+
+    // Body — fluffy yellow oval
+    ctx.fillStyle = '#f5d742';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 5, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Lighter belly
+    ctx.fillStyle = '#fce97a';
+    ctx.beginPath();
+    ctx.ellipse(0.5, 1, 3.5, 2.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head
+    ctx.fillStyle = '#f5d742';
+    ctx.beginPath();
+    ctx.arc(5, -2.5 + peck, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Beak — little orange triangle
+    ctx.fillStyle = '#e8921e';
+    ctx.beginPath();
+    ctx.moveTo(8, -2.5 + peck);
+    ctx.lineTo(11, -1.5 + peck);
+    ctx.lineTo(8, -0.8 + peck);
+    ctx.closePath();
+    ctx.fill();
+
+    // Eye
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(6.2, -3 + peck, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tiny wing
+    ctx.fillStyle = '#e8c832';
+    ctx.beginPath();
+    ctx.ellipse(-1.5, -0.5, 3, 2.2, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Legs
+    ctx.strokeStyle = '#d48020';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(-1.5, 4); ctx.lineTo(-2.5, 7);
+    ctx.moveTo(-2.5, 7); ctx.lineTo(-4, 8);
+    ctx.moveTo(-2.5, 7); ctx.lineTo(-1, 8);
+    ctx.moveTo(2, 4); ctx.lineTo(2.5, 7);
+    ctx.moveTo(2.5, 7); ctx.lineTo(1, 8);
+    ctx.moveTo(2.5, 7); ctx.lineTo(4, 8);
+    ctx.stroke();
+
+    ctx.restore();
+  },
+
+  // Milk cow (Holstein black-and-white): chunky body, spotted pattern, udder, horns.
+  // `tailPhase` drives a gentle tail-swish animation.
+  drawCow(ctx, x, y, dir, tailPhase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+
+    // Body — large white oval
+    ctx.fillStyle = '#f5f0e8';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 22, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Black spots (Holstein pattern)
+    ctx.fillStyle = '#1a1a1a';
+    const spots = [[-8, -6, 7, 5], [4, -4, 6, 5], [-3, 4, 8, 4], [12, 2, 5, 4], [-14, 0, 4, 3]];
+    spots.forEach(s => {
+      ctx.beginPath();
+      ctx.ellipse(s[0], s[1], s[2], s[3], 0.2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Legs (4 sturdy)
+    ctx.fillStyle = '#f5f0e8';
+    ctx.fillRect(-14, 10, 5, 14);
+    ctx.fillRect(-5, 11, 5, 13);
+    ctx.fillRect(6, 11, 5, 13);
+    ctx.fillRect(14, 10, 5, 14);
+    // Hooves
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(-14, 22, 5, 3);
+    ctx.fillRect(-5, 22, 5, 3);
+    ctx.fillRect(6, 22, 5, 3);
+    ctx.fillRect(14, 22, 5, 3);
+
+    // Udder
+    ctx.fillStyle = '#f0c6c6';
+    ctx.beginPath();
+    ctx.ellipse(4, 13, 5, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head
+    ctx.fillStyle = '#f5f0e8';
+    ctx.beginPath();
+    ctx.ellipse(22, -4, 8, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Muzzle
+    ctx.fillStyle = '#e8d0c0';
+    ctx.beginPath();
+    ctx.ellipse(27, -1, 5, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Nostrils
+    ctx.fillStyle = '#8a6a5a';
+    ctx.beginPath(); ctx.arc(26, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(29, 0, 1, 0, Math.PI * 2); ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = '#2a1a0a';
+    ctx.beginPath(); ctx.arc(20, -6, 1.5, 0, Math.PI * 2); ctx.fill();
+
+    // Horns
+    ctx.strokeStyle = '#c8b898';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(19, -10); ctx.quadraticCurveTo(17, -17, 15, -16);
+    ctx.moveTo(24, -10); ctx.quadraticCurveTo(26, -17, 28, -16);
+    ctx.stroke();
+
+    // Ears
+    ctx.fillStyle = '#e8d8c8';
+    ctx.beginPath();
+    ctx.ellipse(16, -9, 4, 2.5, -0.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(27, -9, 4, 2.5, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tail
+    const tailSwish = Math.sin(tailPhase || 0) * 0.4;
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-22, -2);
+    ctx.quadraticCurveTo(-30, -8 + tailSwish * 10, -34, -4 + tailSwish * 12);
+    ctx.stroke();
+    // Tail tuft
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.ellipse(-34, -4 + tailSwish * 12, 3, 2, tailSwish, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  },
+
+  // Horse: sleek muscular body, flowing mane & tail.
+  // `grazePhase` drives a head-dip for grazing animation.
+  drawHorse(ctx, x, y, dir, grazePhase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    const graze = Math.max(0, Math.sin(grazePhase || 0)) * 8;
+
+    // Body — large chestnut oval
+    ctx.fillStyle = '#8B5E3C';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 24, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Darker shoulder/hip shading
+    ctx.fillStyle = '#6B4423';
+    ctx.beginPath();
+    ctx.ellipse(-12, 2, 8, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(10, 2, 6, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Legs (4 long)
+    ctx.fillStyle = '#8B5E3C';
+    ctx.fillRect(-16, 10, 5, 18);
+    ctx.fillRect(-7, 11, 5, 17);
+    ctx.fillRect(6, 11, 5, 17);
+    ctx.fillRect(15, 10, 5, 18);
+    // Hooves
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(-16, 26, 5, 3);
+    ctx.fillRect(-7, 26, 5, 3);
+    ctx.fillRect(6, 26, 5, 3);
+    ctx.fillRect(15, 26, 5, 3);
+
+    // Neck
+    ctx.fillStyle = '#8B5E3C';
+    ctx.beginPath();
+    ctx.moveTo(18, -6);
+    ctx.quadraticCurveTo(26, -16, 28, -12 + graze);
+    ctx.quadraticCurveTo(30, -6 + graze, 22, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Head
+    ctx.fillStyle = '#7A5030';
+    ctx.beginPath();
+    ctx.ellipse(30, -14 + graze, 7, 5.5, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Muzzle
+    ctx.fillStyle = '#9a7a5a';
+    ctx.beginPath();
+    ctx.ellipse(35, -11 + graze, 4, 3.5, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Nostril
+    ctx.fillStyle = '#4a3020';
+    ctx.beginPath(); ctx.arc(37, -10 + graze, 1, 0, Math.PI * 2); ctx.fill();
+
+    // Eye
+    ctx.fillStyle = '#1a0a00';
+    ctx.beginPath(); ctx.arc(28, -15.5 + graze, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(27.5, -16 + graze, 0.5, 0, Math.PI * 2); ctx.fill();
+
+    // Ears
+    ctx.fillStyle = '#7A5030';
+    ctx.beginPath();
+    ctx.moveTo(26, -18 + graze); ctx.lineTo(24, -25 + graze); ctx.lineTo(28, -20 + graze);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(31, -18 + graze); ctx.lineTo(33, -25 + graze); ctx.lineTo(30, -20 + graze);
+    ctx.closePath(); ctx.fill();
+
+    // Mane (flowing along neck)
+    ctx.fillStyle = '#3a2010';
+    ctx.beginPath();
+    ctx.moveTo(24, -18 + graze);
+    ctx.quadraticCurveTo(20, -22, 18, -14);
+    ctx.quadraticCurveTo(19, -10, 22, -6);
+    ctx.quadraticCurveTo(24, -12, 24, -18 + graze);
+    ctx.fill();
+
+    // Tail
+    ctx.strokeStyle = '#3a2010';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    const tailSway = Math.sin((grazePhase || 0) * 1.3) * 6;
+    ctx.beginPath();
+    ctx.moveTo(-24, -2);
+    ctx.quadraticCurveTo(-32, 4 + tailSway, -36, 12 + tailSway);
+    ctx.stroke();
+    // Tail hair fan
+    ctx.fillStyle = '#3a2010';
+    ctx.beginPath();
+    ctx.moveTo(-36, 12 + tailSway);
+    ctx.quadraticCurveTo(-40, 8 + tailSway, -38, 16 + tailSway);
+    ctx.quadraticCurveTo(-34, 18 + tailSway, -36, 12 + tailSway);
+    ctx.fill();
+
+    ctx.restore();
+  },
+
+  // Owl: round body, ear tufts, big saucer eyes, perched on a branch.
+  // `bobPhase` drives a subtle head-bob / blink.
+  drawOwl(ctx, x, y, dir, bobPhase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    const headBob = Math.sin(bobPhase || 0) * 1.5;
+    const blink = Math.sin((bobPhase || 0) * 0.3);
+
+    // Branch to perch on
+    ctx.strokeStyle = '#5a3a1e';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-22, 12);
+    ctx.quadraticCurveTo(0, 8, 22, 14);
+    ctx.stroke();
+
+    // Talons gripping branch
+    ctx.strokeStyle = '#3a3020';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-3, 8); ctx.lineTo(-4, 11);
+    ctx.moveTo(-1, 8); ctx.lineTo(0, 11);
+    ctx.moveTo(3, 8); ctx.lineTo(4, 11);
+    ctx.moveTo(5, 8); ctx.lineTo(6, 11);
+    ctx.stroke();
+
+    // Body — round, puffed-up owl shape
+    ctx.fillStyle = '#6b5a42';
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 10, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Chest/belly pattern (lighter with speckles)
+    ctx.fillStyle = '#c2a878';
+    ctx.beginPath();
+    ctx.ellipse(1, 4, 6, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Chest streaks
+    ctx.strokeStyle = '#8a7050';
+    ctx.lineWidth = 0.7;
+    for (let i = 0; i < 5; i++) {
+      const sy = 1 + i * 2;
+      ctx.beginPath();
+      ctx.moveTo(-3 + i * 0.5, sy);
+      ctx.lineTo(-1 + i * 0.3, sy + 1.5);
+      ctx.lineTo(1 - i * 0.3, sy + 1.5);
+      ctx.lineTo(3 - i * 0.5, sy);
+      ctx.stroke();
+    }
+
+    // Wings (folded at sides)
+    ctx.fillStyle = '#5a4832';
+    ctx.beginPath();
+    ctx.ellipse(-7, 1, 5, 8, 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(7, 1, 5, 8, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head
+    ctx.fillStyle = '#6b5a42';
+    ctx.beginPath();
+    ctx.arc(0, -8 + headBob, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Facial disc (lighter circle around eyes)
+    ctx.fillStyle = '#d4c4a0';
+    ctx.beginPath();
+    ctx.ellipse(0, -7 + headBob, 7, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Darker facial rim
+    ctx.strokeStyle = '#8a7050';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(0, -7 + headBob, 7, 6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Ear tufts
+    ctx.fillStyle = '#5a4832';
+    ctx.beginPath();
+    ctx.moveTo(-5, -14 + headBob); ctx.lineTo(-7, -22 + headBob); ctx.lineTo(-3, -15 + headBob);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(5, -14 + headBob); ctx.lineTo(7, -22 + headBob); ctx.lineTo(3, -15 + headBob);
+    ctx.closePath(); ctx.fill();
+
+    // Big saucer eyes
+    const eyeOpen = blink > 0.92 ? 0.3 : 1; // occasional blink
+    ctx.fillStyle = '#f5e040';
+    ctx.beginPath(); ctx.ellipse(-3, -8 + headBob, 3, 3 * eyeOpen, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(3, -8 + headBob, 3, 3 * eyeOpen, 0, 0, Math.PI * 2); ctx.fill();
+    // Pupils
+    ctx.fillStyle = '#0a0a0a';
+    ctx.beginPath(); ctx.ellipse(-3, -8 + headBob, 1.5, 1.5 * eyeOpen, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(3, -8 + headBob, 1.5, 1.5 * eyeOpen, 0, 0, Math.PI * 2); ctx.fill();
+    // Eye glint
+    if (eyeOpen > 0.5) {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(-2.2, -9 + headBob, 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(3.8, -9 + headBob, 0.7, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Beak
+    ctx.fillStyle = '#5a5040';
+    ctx.beginPath();
+    ctx.moveTo(-1.5, -5.5 + headBob);
+    ctx.lineTo(0, -3 + headBob);
+    ctx.lineTo(1.5, -5.5 + headBob);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   }
 };
