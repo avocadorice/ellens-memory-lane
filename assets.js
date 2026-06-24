@@ -4183,5 +4183,409 @@ const Assets = {
     ctx.fill();
 
     ctx.restore();
-  }
+  },
+
+  // --- Additional Wildlife ---------------------------------------------------
+
+  // Fox: orange-red with white chest, bushy white-tipped tail
+  drawFox(ctx, x, y, dir, phase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    const tailSwish = Math.sin(phase || 0) * 0.3;
+
+    // Bushy tail
+    ctx.save();
+    ctx.translate(-14, -4);
+    ctx.rotate(tailSwish);
+    ctx.fillStyle = '#d4541a';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-10, -14, -18, -8);
+    ctx.quadraticCurveTo(-20, 2, -8, 4);
+    ctx.closePath();
+    ctx.fill();
+    // White tip
+    ctx.fillStyle = '#f5f0e8';
+    ctx.beginPath();
+    ctx.ellipse(-16, -6, 5, 3.5, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Body
+    ctx.fillStyle = '#d4541a';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 14, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Lighter underbelly
+    ctx.fillStyle = '#f08030';
+    ctx.beginPath();
+    ctx.ellipse(2, 3, 10, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // White chest
+    ctx.fillStyle = '#f5f0e8';
+    ctx.beginPath();
+    ctx.ellipse(10, 2, 5, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Legs
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(-8, 6, 3, 8);
+    ctx.fillRect(-2, 6, 3, 7);
+    ctx.fillRect(5, 6, 3, 7);
+    ctx.fillRect(10, 6, 3, 8);
+
+    // Head
+    ctx.fillStyle = '#d4541a';
+    ctx.beginPath();
+    ctx.ellipse(16, -4, 7, 6, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    // White muzzle
+    ctx.fillStyle = '#f5f0e8';
+    ctx.beginPath();
+    ctx.ellipse(20, -1, 4, 3, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Snout/nose
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(23, -1.5, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Eye — amber
+    ctx.fillStyle = '#e8a020';
+    ctx.beginPath(); ctx.arc(15, -6, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(15.3, -6, 0.8, 0, Math.PI * 2); ctx.fill();
+    // Ears
+    ctx.fillStyle = '#d4541a';
+    ctx.beginPath();
+    ctx.moveTo(12, -8); ctx.lineTo(10, -16); ctx.lineTo(14, -10);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(18, -8); ctx.lineTo(19, -16); ctx.lineTo(21, -10);
+    ctx.closePath(); ctx.fill();
+    // Black ear tips
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.moveTo(10, -16); ctx.lineTo(11, -13); ctx.lineTo(9.5, -13);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(19, -16); ctx.lineTo(20, -13); ctx.lineTo(18.5, -13);
+    ctx.closePath(); ctx.fill();
+
+    ctx.restore();
+  },
+
+  // Sheep: fluffy woolly body, dark face and thin legs
+  drawSheep(ctx, x, y, dir, phase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    const jiggle = Math.sin(phase || 0) * 1;
+
+    // Legs
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(-8, 6, 3, 10);
+    ctx.fillRect(-2, 7, 3, 9);
+    ctx.fillRect(5, 7, 3, 9);
+    ctx.fillRect(10, 6, 3, 10);
+
+    // Woolly body — overlapping fluffy circles
+    ctx.fillStyle = '#f5f0e8';
+    const wool = [
+      { cx: 0, cy: 0 + jiggle, r: 10 },
+      { cx: -8, cy: 2 + jiggle * 0.8, r: 8 },
+      { cx: 8, cy: 2 + jiggle * 0.8, r: 8 },
+      { cx: -4, cy: -5 + jiggle * 0.6, r: 7 },
+      { cx: 5, cy: -5 + jiggle * 0.6, r: 7 },
+      { cx: 0, cy: 4 + jiggle * 0.5, r: 7 }
+    ];
+    wool.forEach(w => {
+      ctx.beginPath();
+      ctx.arc(w.cx, w.cy, w.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    // Cream highlights
+    ctx.fillStyle = '#fefcf6';
+    wool.slice(0, 3).forEach(w => {
+      ctx.beginPath();
+      ctx.arc(w.cx - 1, w.cy - 2, w.r * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Head — dark grey
+    ctx.fillStyle = '#3a3a3a';
+    ctx.beginPath();
+    ctx.ellipse(14, -2, 5.5, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Eyes
+    ctx.fillStyle = '#f0e8d0';
+    ctx.beginPath(); ctx.arc(15.5, -3.5, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(15.8, -3.5, 0.6, 0, Math.PI * 2); ctx.fill();
+    // Ears
+    ctx.fillStyle = '#3a3a3a';
+    ctx.beginPath();
+    ctx.ellipse(11, -5, 3, 1.8, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(17, -5, 3, 1.8, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Nose
+    ctx.fillStyle = '#5a5a5a';
+    ctx.beginPath(); ctx.arc(18, -0.5, 1, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  },
+
+  // Cat: orange tabby with swaying tail and whiskers
+  drawCat(ctx, x, y, dir, phase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+
+    // Tail — upright, swaying
+    ctx.save();
+    ctx.translate(-8, -2);
+    ctx.rotate(-0.3 + Math.sin(phase || 0) * 0.3);
+    ctx.strokeStyle = '#e8873c';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-2, -14, -5, -20);
+    ctx.stroke();
+    ctx.restore();
+
+    // Body
+    ctx.fillStyle = '#e8873c';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 9, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Tabby stripes
+    ctx.fillStyle = '#c06020';
+    ctx.fillRect(-5, -3, 2, 6);
+    ctx.fillRect(-1, -4, 2, 7);
+    ctx.fillRect(3, -3, 2, 6);
+
+    // Legs
+    ctx.fillStyle = '#e8873c';
+    ctx.fillRect(-5, 5, 2.5, 6);
+    ctx.fillRect(-1, 5, 2.5, 5);
+    ctx.fillRect(3, 5, 2.5, 5);
+    ctx.fillRect(6, 5, 2.5, 6);
+    // Paws
+    ctx.fillStyle = '#f5e0c8';
+    ctx.fillRect(-5.5, 10, 3.5, 1.5);
+    ctx.fillRect(6, 10, 3.5, 1.5);
+
+    // Head
+    ctx.fillStyle = '#e8873c';
+    ctx.beginPath();
+    ctx.arc(10, -3, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Ears
+    ctx.beginPath();
+    ctx.moveTo(7, -6); ctx.lineTo(6, -13); ctx.lineTo(9, -8);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(13, -6); ctx.lineTo(14, -13); ctx.lineTo(12, -8);
+    ctx.closePath(); ctx.fill();
+    // Pink ear insides
+    ctx.fillStyle = '#f0a0a0';
+    ctx.beginPath();
+    ctx.moveTo(7.5, -7); ctx.lineTo(6.8, -11); ctx.lineTo(8.5, -8);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(12.5, -7); ctx.lineTo(13.3, -11); ctx.lineTo(12, -8);
+    ctx.closePath(); ctx.fill();
+    // Eyes — green
+    ctx.fillStyle = '#5a8a3a';
+    ctx.beginPath(); ctx.ellipse(8.5, -3.5, 1.4, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(12, -3.5, 1.4, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+    // Pupils — vertical slits
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(8.2, -4.5, 0.8, 2.2);
+    ctx.fillRect(11.7, -4.5, 0.8, 2.2);
+    // Nose
+    ctx.fillStyle = '#e87080';
+    ctx.beginPath(); ctx.arc(10.2, -1.5, 0.8, 0, Math.PI * 2); ctx.fill();
+    // Whiskers
+    ctx.strokeStyle = '#d8c0a0';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(12, -1.5); ctx.lineTo(18, -3);
+    ctx.moveTo(12, -1); ctx.lineTo(18, -0.5);
+    ctx.moveTo(12, -0.5); ctx.lineTo(17, 1.5);
+    ctx.moveTo(8, -1.5); ctx.lineTo(3, -3.5);
+    ctx.moveTo(8, -1); ctx.lineTo(3, -1);
+    ctx.moveTo(8, -0.5); ctx.lineTo(3.5, 1);
+    ctx.stroke();
+
+    ctx.restore();
+  },
+
+  // Rabbit: brown with twitching long ears, fluffy round body, cotton tail
+  drawRabbit(ctx, x, y, dir, phase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+
+    // Cotton tail
+    ctx.fillStyle = '#f5f5f5';
+    ctx.beginPath(); ctx.arc(-10, 1, 3, 0, Math.PI * 2); ctx.fill();
+
+    // Body
+    ctx.fillStyle = '#b8956a';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Lighter belly
+    ctx.fillStyle = '#d4b896';
+    ctx.beginPath();
+    ctx.ellipse(2, 3, 7, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hind legs (visible haunches)
+    ctx.fillStyle = '#b8956a';
+    ctx.beginPath();
+    ctx.ellipse(-5, 5, 5, 4, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Front paws
+    ctx.fillRect(7, 5, 3, 5);
+    ctx.fillRect(4, 6, 3, 4);
+
+    // Head
+    ctx.fillStyle = '#b8956a';
+    ctx.beginPath();
+    ctx.arc(10, -4, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ears — long, twitching
+    ctx.save();
+    ctx.translate(8, -8);
+    ctx.rotate(-0.1 + Math.sin((phase || 0) * 0.7) * 0.15);
+    ctx.fillStyle = '#b8956a';
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 2.5, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e8b8a0';
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 1.3, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Second ear
+    ctx.save();
+    ctx.translate(12, -8);
+    ctx.rotate(0.1 + Math.sin((phase || 0) * 0.7 + 1.5) * 0.15);
+    ctx.fillStyle = '#b8956a';
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 2.5, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e8b8a0';
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 1.3, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Eye
+    ctx.fillStyle = '#2a1a0a';
+    ctx.beginPath(); ctx.arc(12.5, -5, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(12, -5.3, 0.4, 0, Math.PI * 2); ctx.fill();
+    // Pink nose
+    ctx.fillStyle = '#e8a0a0';
+    ctx.beginPath(); ctx.arc(14.5, -2.5, 1, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  },
+
+  // Squirrel: grey-brown, big bushy curved tail, sitting upright
+  drawSquirrel(ctx, x, y, dir, phase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+
+    // Bushy tail — curved upward behind body
+    ctx.save();
+    ctx.translate(-4, -2);
+    ctx.rotate(Math.sin(phase || 0) * 0.2);
+    ctx.fillStyle = '#7a6a5a';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-8, -6, -6, -16);
+    ctx.quadraticCurveTo(-2, -20, 2, -12);
+    ctx.quadraticCurveTo(4, -6, 0, 0);
+    ctx.fill();
+    // Lighter edge
+    ctx.fillStyle = '#a89888';
+    ctx.beginPath();
+    ctx.moveTo(-1, -2);
+    ctx.quadraticCurveTo(-6, -8, -4, -14);
+    ctx.quadraticCurveTo(-1, -16, 1, -10);
+    ctx.quadraticCurveTo(2, -6, -1, -2);
+    ctx.fill();
+    ctx.restore();
+
+    // Body — sitting upright
+    ctx.fillStyle = '#8a7a6a';
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 6, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Lighter belly
+    ctx.fillStyle = '#a89888';
+    ctx.beginPath();
+    ctx.ellipse(1, 4, 4, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hind feet
+    ctx.fillStyle = '#7a6a5a';
+    ctx.beginPath();
+    ctx.ellipse(-3, 9, 4, 2, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(3, 9, 4, 2, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Front paws — held up
+    ctx.fillStyle = '#7a6a5a';
+    ctx.fillRect(2, -2, 2, 4);
+    ctx.fillRect(5, -1, 2, 3);
+    // Tiny paw detail
+    ctx.fillStyle = '#a89888';
+    ctx.beginPath(); ctx.arc(3, -2.5, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -1.5, 1.5, 0, Math.PI * 2); ctx.fill();
+
+    // Head
+    ctx.fillStyle = '#8a7a6a';
+    ctx.beginPath();
+    ctx.arc(4, -8, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Cheeks
+    ctx.fillStyle = '#a89888';
+    ctx.beginPath();
+    ctx.ellipse(6, -6, 3, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Ears
+    ctx.fillStyle = '#8a7a6a';
+    ctx.beginPath();
+    ctx.moveTo(1, -11); ctx.lineTo(-1, -16); ctx.lineTo(3, -12);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(6, -12); ctx.lineTo(8, -16); ctx.lineTo(7, -12);
+    ctx.closePath(); ctx.fill();
+    // Ear insides
+    ctx.fillStyle = '#c8b8a0';
+    ctx.beginPath(); ctx.arc(0.5, -13.5, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(7, -13.5, 1, 0, Math.PI * 2); ctx.fill();
+    // Eye — big and round
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(6.5, -9, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(6, -9.5, 0.5, 0, Math.PI * 2); ctx.fill();
+    // Nose
+    ctx.fillStyle = '#4a3a2a';
+    ctx.beginPath(); ctx.arc(8.5, -7, 0.8, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  },
 };

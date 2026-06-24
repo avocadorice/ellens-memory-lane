@@ -751,6 +751,96 @@ const Game = {
         phase: i * 1.9
       });
     });
+
+    // Foxes — trotting through fields
+    const foxSpots = [4600, 10500, 18500, 25500, 34000];
+    foxSpots.forEach((sx, i) => {
+      let skip = false;
+      this.levels.forEach(lvl => { if (Math.abs(sx - lvl.x) < 200) skip = true; });
+      if (skip) return;
+      this.farmAnimals.push({
+        type: 'fox',
+        x: sx + ((i * 31) % 60),
+        y: this.height - 88,
+        dir: i % 2 === 0 ? 1 : -1,
+        phase: i * 1.6,
+        drift: 0,
+        driftSpeed: 0.25 + (i % 3) * 0.1
+      });
+    });
+
+    // Sheep — small flocks grazing
+    const sheepSpots = [3200, 8200, 14000, 21000, 28000];
+    sheepSpots.forEach((sx, i) => {
+      let skip = false;
+      this.levels.forEach(lvl => { if (Math.abs(sx - lvl.x) < 200) skip = true; });
+      if (skip) return;
+      const count = 2 + (i % 2); // 2–3 sheep per flock
+      for (let j = 0; j < count; j++) {
+        this.farmAnimals.push({
+          type: 'sheep',
+          x: sx + j * 45 + ((i * 19 + j * 37) % 30),
+          y: this.height - 84,
+          dir: (i + j) % 2 === 0 ? 1 : -1,
+          phase: i * 2.0 + j * 1.3
+        });
+      }
+    });
+
+    // Cats — lounging or strolling
+    const catSpots = [2800, 7400, 13500, 20500, 27500, 33200];
+    catSpots.forEach((sx, i) => {
+      let skip = false;
+      this.levels.forEach(lvl => { if (Math.abs(sx - lvl.x) < 180) skip = true; });
+      if (skip) return;
+      this.farmAnimals.push({
+        type: 'cat',
+        x: sx + ((i * 27) % 50),
+        y: this.height - 76,
+        dir: i % 2 === 0 ? 1 : -1,
+        phase: i * 1.8,
+        drift: 0,
+        driftSpeed: 0.15 + (i % 2) * 0.1
+      });
+    });
+
+    // Rabbits — hopping around in small groups
+    const rabbitSpots = [1600, 5800, 10000, 15800, 22500, 29500, 35000];
+    rabbitSpots.forEach((sx, i) => {
+      let skip = false;
+      this.levels.forEach(lvl => { if (Math.abs(sx - lvl.x) < 160) skip = true; });
+      if (skip) return;
+      const count = 1 + (i % 3); // 1–3 rabbits
+      for (let j = 0; j < count; j++) {
+        this.farmAnimals.push({
+          type: 'rabbit',
+          x: sx + j * 28 + ((i * 11 + j * 23) % 20),
+          y: this.height - 78,
+          dir: (i + j) % 2 === 0 ? 1 : -1,
+          phase: i * 1.5 + j * 2.4,
+          drift: 0,
+          driftSpeed: 0.35 + (j % 2) * 0.15
+        });
+      }
+    });
+
+    // Squirrels — sitting upright, scattered near trees
+    const squirrelSpots = [1200, 4000, 7800, 12000, 16800, 23000, 28500, 32000, 36000];
+    squirrelSpots.forEach((sx, i) => {
+      let skip = false;
+      this.levels.forEach(lvl => { if (Math.abs(sx - lvl.x) < 150) skip = true; });
+      if (skip) return;
+      this.farmAnimals.push({
+        type: 'squirrel',
+        x: sx + ((i * 23) % 40) - 20,
+        y: this.height - 72,
+        dir: i % 2 === 0 ? 1 : -1,
+        phase: i * 2.1,
+        drift: 0,
+        driftSpeed: 0.4 + (i % 3) * 0.1
+      });
+    });
+
     this.heartsCollected = 0;
 
     // Reset player combat loadout
@@ -3045,10 +3135,23 @@ const Game = {
     this.farmAnimals.forEach(a => {
       // Advance animation phase at different rates per animal type
       switch (a.type) {
-        case 'chick': a.phase += 0.07; break;   // pecking
-        case 'cow':   a.phase += 0.02; break;   // slow tail swish
-        case 'horse': a.phase += 0.025; break;  // grazing head dip
-        case 'owl':   a.phase += 0.04; break;   // head bob + blink
+        case 'chick':    a.phase += 0.07;  break;
+        case 'cow':      a.phase += 0.02;  break;
+        case 'horse':    a.phase += 0.025; break;
+        case 'owl':      a.phase += 0.04;  break;
+        case 'fox':      a.phase += 0.045; break;
+        case 'sheep':    a.phase += 0.03;  break;
+        case 'cat':      a.phase += 0.05;  break;
+        case 'rabbit':   a.phase += 0.06;  break;
+        case 'squirrel': a.phase += 0.055; break;
+      }
+      // Dynamic drift movement for roaming animals
+      if (a.driftSpeed) {
+        a.drift = (a.drift || 0) + a.dir * a.driftSpeed * Math.max(0, Math.sin(a.phase * 0.3));
+        if (Math.abs(a.drift) > 50) {
+          a.dir *= -1;
+          a.drift *= 0.8;
+        }
       }
     });
   },
@@ -3057,7 +3160,7 @@ const Game = {
     if (!this.farmAnimals) return;
     const ctx = this.ctx;
     this.farmAnimals.forEach(a => {
-      const rx = a.x - camX;
+      const rx = (a.x + (a.drift || 0)) - camX;
       // Cull with generous margins (horses/cows are ~70px wide)
       if (rx < -80 || rx > this.width + 80) return;
       switch (a.type) {
@@ -3072,6 +3175,21 @@ const Game = {
           break;
         case 'owl':
           Assets.drawOwl(ctx, rx, a.y, a.dir, a.phase);
+          break;
+        case 'fox':
+          Assets.drawFox(ctx, rx, a.y, a.dir, a.phase);
+          break;
+        case 'sheep':
+          Assets.drawSheep(ctx, rx, a.y, a.dir, a.phase);
+          break;
+        case 'cat':
+          Assets.drawCat(ctx, rx, a.y, a.dir, a.phase);
+          break;
+        case 'rabbit':
+          Assets.drawRabbit(ctx, rx, a.y, a.dir, a.phase);
+          break;
+        case 'squirrel':
+          Assets.drawSquirrel(ctx, rx, a.y, a.dir, a.phase);
           break;
       }
     });
