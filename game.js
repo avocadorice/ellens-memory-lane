@@ -841,6 +841,16 @@ const Game = {
       });
     });
 
+    // --- Barney waiting on a chair at the Dating milestone --------------------
+    // He sits in a folding chair just before the Dating milestone (x=2000),
+    // facing right, waiting for Ellen. When she reaches him, he stands and
+    // becomes a walking companion.
+    this.seatedBarney = {
+      x: this.levels[0].x - 100, // slightly before the milestone
+      y: this.height - 80,
+      dir: 1,
+      joined: false
+    };
     this.heartsCollected = 0;
 
     // Reset player combat loadout
@@ -2674,8 +2684,9 @@ const Game = {
       });
     }
 
-    // 2. Husband (Barney) joins at the Dating milestone (index 0) onward
-    if (this.player.x >= this.levels[0].x) {
+    // 2. Husband (Barney) joins at the Dating milestone (index 0) onward,
+    //    but only after Ellen has walked up to him sitting on his chair.
+    if (this.player.x >= this.levels[0].x && this.seatedBarney && this.seatedBarney.joined) {
       this.companions.push({
         type: 'husband',
         x: this.player.x - 30 * this.player.dir,
@@ -3154,6 +3165,17 @@ const Game = {
         }
       }
     });
+    // Update seated Barney (check if Ellen has reached him)
+    this.updateSeatedBarney();
+  },
+
+  // Barney sits on a chair at the Dating milestone until Ellen walks up to him
+  updateSeatedBarney() {
+    if (!this.seatedBarney || this.seatedBarney.joined) return;
+    const dist = Math.abs(this.player.x - this.seatedBarney.x);
+    if (dist < 50) {
+      this.seatedBarney.joined = true; // he stands up and joins as companion
+    }
   },
 
   drawFarmAnimals(camX) {
@@ -3193,6 +3215,14 @@ const Game = {
           break;
       }
     });
+
+    // Draw seated Barney (if he hasn't joined Ellen yet)
+    if (this.seatedBarney && !this.seatedBarney.joined) {
+      const brx = this.seatedBarney.x - camX;
+      if (brx > -60 && brx < this.width + 60) {
+        Assets.drawSeatedHusband(this.ctx, brx, this.seatedBarney.y, 'casual', this.seatedBarney.dir);
+      }
+    }
   },
 
   // --- Rain that builds as she nears the boss arena (none -> light -> heavy),

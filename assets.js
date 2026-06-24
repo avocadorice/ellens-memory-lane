@@ -4588,4 +4588,87 @@ const Assets = {
 
     ctx.restore();
   },
+
+  // Barney seated on a folding chair (pre-Dating milestone, waiting for Ellen)
+  drawSeatedHusband(ctx, x, y, outfit, dir) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+
+    // Folding chair
+    // Back legs
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-12, 0); ctx.lineTo(-8, -24);
+    ctx.moveTo(8, 0); ctx.lineTo(12, -24);
+    ctx.stroke();
+    // Front legs
+    ctx.beginPath();
+    ctx.moveTo(-10, 0); ctx.lineTo(-14, -20);
+    ctx.moveTo(6, 0); ctx.lineTo(10, -20);
+    ctx.stroke();
+    // Seat canvas
+    ctx.fillStyle = '#3a6e8a';
+    ctx.fillRect(-14, -22, 26, 4);
+    // Back rest
+    ctx.fillStyle = '#3a6e8a';
+    ctx.fillRect(-9, -38, 20, 4);
+    // Back rest supports
+    ctx.strokeStyle = '#888';
+    ctx.beginPath();
+    ctx.moveTo(-8, -24); ctx.lineTo(-8, -38);
+    ctx.moveTo(10, -24); ctx.lineTo(10, -38);
+    ctx.stroke();
+
+    // --- Barney sitting ---
+    // Legs bent at ~90°
+    ctx.fillStyle = '#e9c46a'; // khaki pants
+    // Thighs (horizontal on seat)
+    ctx.fillRect(-8, -26, 7, 6);
+    ctx.fillRect(3, -26, 7, 6);
+    // Shins (hanging down)
+    ctx.fillStyle = '#e9c46a';
+    ctx.fillRect(-9, -21, 6, 12);
+    ctx.fillRect(5, -21, 6, 12);
+    // Shoes
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-10, -10, 8, 4);
+    ctx.fillRect(4, -10, 8, 4);
+
+    // Body — blue t-shirt
+    ctx.fillStyle = '#457b9d';
+    ctx.fillRect(-8, -44, 18, 18);
+
+    // Arms resting on knees
+    ctx.fillStyle = '#ffd1ac';
+    ctx.fillRect(-10, -32, 5, 10); // left arm
+    ctx.fillRect(7, -32, 5, 10);  // right arm
+
+    // Head
+    ctx.fillStyle = '#ffd1ac';
+    ctx.beginPath();
+    ctx.arc(1, -54, 10, 0, Math.PI * 2);
+    ctx.fill();
+    // Hair
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(1, -56, 11, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-10, -56, 6, 6);
+    // Eye
+    ctx.fillStyle = '#1e1e2f';
+    ctx.beginPath();
+    ctx.arc(5, -55, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    // Smile
+    ctx.strokeStyle = '#c4956a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(4, -51, 3, 0.1, Math.PI - 0.1);
+    ctx.stroke();
+
+    ctx.restore();
+  }
 };
