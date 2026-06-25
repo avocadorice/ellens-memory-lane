@@ -61,6 +61,20 @@
       </div>
     </div>
 
+    <!-- UI Overlay: 2-Player join prompt (shown when Ellen reaches Barney) -->
+    <div id="twoplayer-prompt" class="overlay">
+      <div class="glass-panel menu-panel" style="text-align:center;">
+        <div class="heart-header">🎮</div>
+        <h1 class="title" style="font-size:1.8rem;">Play together?</h1>
+        <p class="subtitle">Barney's here! A second player can join as Barney — scan the QR with the ChillStick app, then pick <b>2 Players</b>.</p>
+        <div id="twoplayer-qr" style="margin:6px auto;"></div>
+        <div class="ending-btn-row">
+          <button id="twoplayer-yes-btn" class="btn primary-btn ending-choice focused" tabindex="-1">🎮 2 Players</button>
+          <button id="twoplayer-solo-btn" class="btn secondary-btn ending-choice" tabindex="-1">Continue Solo</button>
+        </div>
+      </div>
+    </div>
+
     <!-- UI Overlay: Ending Screen -->
     <div id="ending-screen" class="overlay">
       <div class="glass-panel ending-panel" style="text-align: center;">

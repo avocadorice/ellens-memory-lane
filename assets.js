@@ -535,10 +535,11 @@ const Assets = {
   },
 
   // Draw Husband (Partnership milestones)
-  drawHusband(ctx, x, y, outfit, frame, dir, scale = 1) {
+  drawHusband(ctx, x, y, outfit, frame, dir, scale = 1, shout = false) {
     const animFrame = Math.floor(frame) % 24;
-    if (this.checkOptimize()) {
-      this._drawHusbandDirect(ctx, x, y, outfit, animFrame, dir, scale);
+    // Shouting opens his mouth — a transient state, so skip the sprite cache.
+    if (this.checkOptimize() || shout) {
+      this._drawHusbandDirect(ctx, x, y, outfit, animFrame, dir, scale, shout);
       return;
     }
     const key = `husband_${outfit}_${animFrame}_${scale}`;
@@ -560,7 +561,7 @@ const Assets = {
     ctx.restore();
   },
 
-  _drawHusbandDirect(ctx, x, y, outfit, frame, dir, scale = 1) {
+  _drawHusbandDirect(ctx, x, y, outfit, frame, dir, scale = 1, shout = false) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir * scale, scale);
@@ -743,18 +744,18 @@ const Assets = {
     }
 
     // --- ARMS ---
-    ctx.fillStyle = '#ffd1ac';
-    // Arm 1 (back)
-    ctx.save();
-    ctx.translate(-11, -44 + bounce * 0.3);
-    ctx.rotate(-walkCycle * 0.3);
-    ctx.fillStyle = outfit === 'graduation' ? '#1e1e24' :
+    const armColor = outfit === 'graduation' ? '#1e1e24' :
                    (outfit === 'tuxedo' ? '#111115' :
                    (outfit === 'suit' ? '#1d3557' :
                    (outfit === 'red_vneck' ? '#d62828' :
                    (outfit === 'flannel' ? '#8b2500' :
                    (outfit === 'dad_casual' ? '#588157' :
                    (outfit === 'hiking' ? '#e63946' : '#457b9d'))))));
+    // Arm 1 (back)
+    ctx.save();
+    ctx.translate(-11, -44 + bounce * 0.3);
+    ctx.rotate(-walkCycle * 0.3);
+    ctx.fillStyle = armColor;
     ctx.fillRect(-3, 0, 6, 19);
     ctx.fillStyle = '#ffd1ac';
     ctx.beginPath();
@@ -762,22 +763,30 @@ const Assets = {
     ctx.fill();
     ctx.restore();
 
-    // Arm 2 (front)
+    // Arm 2 (front) — thrusts straight forward into a punch while shouting
     ctx.save();
     ctx.translate(11, -44 + bounce * 0.3);
-    ctx.rotate(walkCycle * 0.3);
-    ctx.fillStyle = outfit === 'graduation' ? '#1e1e24' :
-                   (outfit === 'tuxedo' ? '#111115' :
-                   (outfit === 'suit' ? '#1d3557' :
-                   (outfit === 'red_vneck' ? '#d62828' :
-                   (outfit === 'flannel' ? '#8b2500' :
-                   (outfit === 'dad_casual' ? '#588157' :
-                   (outfit === 'hiking' ? '#e63946' : '#457b9d'))))));
-    ctx.fillRect(-3, 0, 6, 19);
-    ctx.fillStyle = '#ffd1ac';
-    ctx.beginPath();
-    ctx.arc(0, 20, 4, 0, Math.PI * 2);
-    ctx.fill();
+    if (shout) {
+      ctx.rotate(-1.4); // swing the down-arm up to point forward
+      ctx.fillStyle = armColor;   // sleeve / upper arm
+      ctx.fillRect(-3, 0, 6, 13);
+      ctx.fillStyle = '#ffd1ac';  // skin forearm
+      ctx.fillRect(-3, 12, 6, 10);
+      // blocky fist with knuckle creases (clearly a fist, not a chop arc)
+      ctx.fillStyle = '#f6c39e';
+      ctx.fillRect(-4.5, 21, 9, 8);
+      ctx.fillStyle = 'rgba(150,100,70,0.35)';
+      ctx.fillRect(-4.5, 23.5, 9, 1);
+      ctx.fillRect(-4.5, 26, 9, 1);
+    } else {
+      ctx.rotate(walkCycle * 0.3);
+      ctx.fillStyle = armColor;
+      ctx.fillRect(-3, 0, 6, 19);
+      ctx.fillStyle = '#ffd1ac';
+      ctx.beginPath();
+      ctx.arc(0, 20, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
 
     // --- HEAD & FACE ---
@@ -793,12 +802,19 @@ const Assets = {
     ctx.arc(9, -62 + bounce * 0.5, 1.8, 0, Math.PI * 2);
     ctx.fill();
 
-    // Smile
-    ctx.strokeStyle = '#1e1e2f';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(6.5, -57 + bounce * 0.5, 3, 0.1, Math.PI - 0.1);
-    ctx.stroke();
+    // Mouth: open (shouting "Aya!") or a relaxed smile
+    if (shout) {
+      ctx.fillStyle = '#7a2e2e';
+      ctx.beginPath();
+      ctx.ellipse(6.5, -55 + bounce * 0.5, 2.4, 3.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#1e1e2f';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(6.5, -57 + bounce * 0.5, 3, 0.1, Math.PI - 0.1);
+      ctx.stroke();
+    }
 
     // --- HAIR ---
     ctx.fillStyle = '#1a1a1a'; // Barney: black hair
@@ -977,10 +993,10 @@ const Assets = {
   },
 
   // Draw Toddler / Kids
-  drawKid(ctx, x, y, type, frame, dir, lvlIdx = 9) {
+  drawKid(ctx, x, y, type, frame, dir, lvlIdx = 9, shout = false) {
     const animFrame = Math.floor(frame) % 24;
-    if (this.checkOptimize()) {
-      this._drawKidDirect(ctx, x, y, type, animFrame, dir, lvlIdx);
+    if (this.checkOptimize() || shout) {
+      this._drawKidDirect(ctx, x, y, type, animFrame, dir, lvlIdx, shout);
       return;
     }
     const key = `kid_${type}_${animFrame}_${lvlIdx}`;
@@ -1002,7 +1018,7 @@ const Assets = {
     ctx.restore();
   },
 
-  _drawKidDirect(ctx, x, y, type, frame, dir, lvlIdx = 9) {
+  _drawKidDirect(ctx, x, y, type, frame, dir, lvlIdx = 9, shout = false) {
     let scale = 0.6;
     if (type === 'kid1') {
       scale = (lvlIdx >= 8) ? 0.78 : 0.55; // Preston grows taller when Blaire starts walking in Level 9 & 10!
@@ -1082,12 +1098,19 @@ const Assets = {
       ctx.arc(9, -13, 1.2, 0, Math.PI*2);
       ctx.fill();
 
-      // Smile
-      ctx.strokeStyle = '#1e1e2f';
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.arc(8.5, -10, 1.8, 0.1, Math.PI - 0.1);
-      ctx.stroke();
+      // Mouth: open (shouting) or a smile
+      if (shout) {
+        ctx.fillStyle = '#7a2e2e';
+        ctx.beginPath();
+        ctx.ellipse(8.5, -9, 1.8, 2.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = '#1e1e2f';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(8.5, -10, 1.8, 0.1, Math.PI - 0.1);
+        ctx.stroke();
+      }
 
       // Hair
       ctx.fillStyle = '#4a3728';
@@ -3395,40 +3418,44 @@ const Assets = {
 
   // Karate chop: a quick fist thrust forward with an impact burst.
   // progress 0..1 — fist punches out, then the impact star pops.
+  // An abstract "chop" effect — a downward sweeping whoosh arc plus a starburst
+  // at the strike point. Deliberately NOT an anatomical arm/fist (the character
+  // already draws its own arm); this just sells the impact.
   drawKarateChop(ctx, x, y, dir, progress) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir, 1);
-    // Fist thrust distance (eases out then settles)
-    const reach = Math.sin(Math.min(1, progress) * Math.PI) * 18 + 8;
-    // Forearm
-    ctx.strokeStyle = '#f0b890';
-    ctx.lineWidth = 6;
+    const p = Math.min(1, Math.max(0, progress));
+    const s = Math.sin(p * Math.PI); // 0 -> 1 -> 0 intensity
     ctx.lineCap = 'round';
+
+    // Two crescent "whoosh" arcs sweeping down-forward.
+    ctx.strokeStyle = '#ffffff';
+    ctx.globalAlpha = 0.9 * s;
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(-2, 2);
-    ctx.lineTo(reach - 6, 0);
+    ctx.arc(0, -2, 15, -Math.PI * 0.62, Math.PI * 0.12);
     ctx.stroke();
-    // Fist
-    ctx.fillStyle = '#f6c39e';
+    ctx.globalAlpha = 0.4 * s;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(reach, 0, 6, 0, Math.PI * 2);
-    ctx.fill();
-    // Impact burst (strongest mid-punch)
-    const burst = Math.sin(Math.min(1, progress) * Math.PI);
-    if (burst > 0.25) {
-      ctx.globalAlpha = burst;
-      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        const r1 = 7, r2 = 7 + 7 * burst;
-        ctx.beginPath();
-        ctx.moveTo(reach + Math.cos(a) * r1, Math.sin(a) * r1);
-        ctx.lineTo(reach + Math.cos(a) * r2, Math.sin(a) * r2);
-        ctx.stroke();
-      }
+    ctx.arc(0, -2, 21, -Math.PI * 0.52, Math.PI * 0.02);
+    ctx.stroke();
+
+    // Starburst at the end of the swing (the strike point).
+    const ex = Math.cos(0.12) * 15;
+    const ey = -2 + Math.sin(0.12) * 15;
+    ctx.globalAlpha = s;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const r1 = 3, r2 = 4 + 8 * s;
+      ctx.beginPath();
+      ctx.moveTo(ex + Math.cos(a) * r1, ey + Math.sin(a) * r1);
+      ctx.lineTo(ex + Math.cos(a) * r2, ey + Math.sin(a) * r2);
+      ctx.stroke();
     }
+    ctx.globalAlpha = 1;
     ctx.restore();
   },
 
@@ -4623,13 +4650,12 @@ const Assets = {
     ctx.stroke();
 
     // --- Barney sitting ---
-    // Legs bent at ~90°
-    ctx.fillStyle = '#e9c46a'; // khaki pants
+    // Legs bent at ~90° — dark navy jeans (matches his walking 'red_vneck' outfit)
+    ctx.fillStyle = '#1d3557';
     // Thighs (horizontal on seat)
     ctx.fillRect(-8, -26, 7, 6);
     ctx.fillRect(3, -26, 7, 6);
     // Shins (hanging down)
-    ctx.fillStyle = '#e9c46a';
     ctx.fillRect(-9, -21, 6, 12);
     ctx.fillRect(5, -21, 6, 12);
     // Shoes
@@ -4637,9 +4663,17 @@ const Assets = {
     ctx.fillRect(-10, -10, 8, 4);
     ctx.fillRect(4, -10, 8, 4);
 
-    // Body — blue t-shirt
-    ctx.fillStyle = '#457b9d';
+    // Body — red V-neck t-shirt (matches his walking 'red_vneck' outfit)
+    ctx.fillStyle = '#d62828';
     ctx.fillRect(-8, -44, 18, 18);
+    // V-neck cut (skin showing through)
+    ctx.fillStyle = '#ffd1ac';
+    ctx.beginPath();
+    ctx.moveTo(-3, -44);
+    ctx.lineTo(5, -44);
+    ctx.lineTo(1, -37);
+    ctx.closePath();
+    ctx.fill();
 
     // Arms resting on knees
     ctx.fillStyle = '#ffd1ac';

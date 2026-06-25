@@ -456,6 +456,21 @@ const Game = {
     isDead: false
   },
 
+  // Player 2 (Barney, later Preston) for local co-op. Independent body —
+  // move + jump + karate chop only (no racket/tennis/soccer weapons).
+  player2: {
+    x: 150, y: 0, width: 30, height: 60,
+    vx: 0, vy: 0, speed: 5.5, gravity: 0.7, jumpForce: -13,
+    isGrounded: false, animFrame: 0, dir: 1,
+    attackTimer: 0, attackType: 'karate', attackMax: 12,
+    health: 3, maxHealth: 3, invuln: 0,
+    isDead: false, reviveTimer: 0,
+    active: false,        // true once 2-player is chosen
+    role: 'husband',      // 'husband' (lvlIdx < 7) | 'kid1' (Preston, lvlIdx >= 7)
+    yHistory: []
+  },
+  _swingId2: 0,
+
   // Combat tuning constants
   combat: {
     swingDuration: 16,   // frames a racket swing stays active
@@ -513,8 +528,17 @@ const Game = {
   },
 
   // Input states
-  keys: {},
-  
+  keys: {},                                  // Player 1 (Ellen) — remote/desktop/ctrl
+  keys2: { left: false, right: false },      // Player 2 (held movement)
+
+  // --- 2-player co-op state ---
+  twoPlayer: false,
+  playerCount: 1,
+  p1Slot: null,           // controller connection slot bound to Ellen
+  p2Slot: null,           // controller connection slot bound to Barney/Preston
+  twoPlayerPrompted: false, // the "play together?" prompt has been shown once
+  twoPlayerFocusIndex: 0,   // 0 = "2 Players", 1 = "Continue Solo"
+
   // Dialog State
   activeDialog: null,
   dialogIndex: 0,
@@ -848,7 +872,7 @@ const Game = {
     this.seatedBarney = {
       x: this.levels[0].x - 100, // slightly before the milestone
       y: this.height - 80,
-      dir: 1,
+      dir: -1, // face left, watching for Ellen as she walks up from behind
       joined: false
     };
     this.heartsCollected = 0;
@@ -857,9 +881,12 @@ const Game = {
     this.player.weapon = null;
     this.player.hasBalls = false;
     this.player.hasSoccer = false; // granted by the soccer-ball pickup
-    this.soccerQueue = null;       // circular kicking line (built on pickup)
-    this.soccerPos = {};           // animated display x per family member
-    this.soccerJogT = 0;
+    this.soccerQueue = null;       // P1 circular kicking line (built on pickup)
+    this.soccerQueue2 = null;      // P2 kicking line (2-player co-op only)
+    this.soccerPos = {};           // animated display x per family member (P1 line)
+    this.soccerPos2 = {};          // animated display x (P2 line)
+    this._soccerJog1 = { id: null, t: 0 }; // ex-kicker jog-to-back (P1 line)
+    this._soccerJog2 = { id: null, t: 0 }; // ex-kicker jog-to-back (P2 line)
     this.hopTimers = { husband: 0, kid1: 0, kid2: 0, dog: 0 };
     this.player.health = this.player.maxHealth;
     this.player.attackTimer = 0;
@@ -1274,6 +1301,22 @@ const Game = {
         }
       }
 
+      // 2-Player prompt: ←/→ choose, Enter/Space confirm
+      const tpPrompt = document.getElementById('twoplayer-prompt');
+      if (tpPrompt && tpPrompt.classList.contains('active')) {
+        if (code === 'ArrowLeft' || code === 'ArrowRight') {
+          this.twoPlayerFocusIndex = this.twoPlayerFocusIndex === 0 ? 1 : 0;
+          this.updateTwoPlayerFocus();
+          e.preventDefault();
+          return;
+        }
+        if (code === 'Enter' || code === 'Space') {
+          this.chooseTwoPlayer(this.twoPlayerFocusIndex === 0);
+          e.preventDefault();
+          return;
+        }
+      }
+
       // Escape or M key to toggle chapter menu (dev only)
       if (DEV_MODE && (code === 'Escape' || code === 'KeyM')) {
         if (menu) {
@@ -1328,8 +1371,7 @@ const Game = {
         this.bossDefeated = false; this.bossActive = false; this.boss = null;
         this.enemyProjectiles = []; this.viewZoom = 1;
         this.player.hasSoccer = true; // arrive with the soccer ball
-        this.soccerQueue = ['player', 'husband', 'kid1', 'kid2', 'dog'];
-        this.soccerPos = {};
+        this.setupSoccerLines();
         this.player.weapon = 'racket';
         this.player.health = this.player.maxHealth;
         this.player.isDead = false; this.player.invuln = 0; this.player.attackTimer = 0;
@@ -1352,7 +1394,19 @@ const Game = {
           e.preventDefault();
         }
       }
+
+      // --- Player 2 (desktop dev keys): H/L move, U jump, O chop ---
+      if (code === 'KeyH') { this.applyAction(1, 'left', true); e.preventDefault(); }
+      else if (code === 'KeyL') { this.applyAction(1, 'right', true); e.preventDefault(); }
+      else if (code === 'KeyU') { this.applyAction(1, 'jump', true); e.preventDefault(); }
+      else if (code === 'KeyO') { this.applyAction(1, 'chop', true); e.preventDefault(); }
+
+      // Dev: toggle 2-player co-op for desktop testing (P)
+      if (DEV_MODE && code === 'KeyP') { if (!this.twoPlayer) this.enableTwoPlayer(); e.preventDefault(); }
     });
+
+    // Tagged controller events from the native Android bridge (slot-aware).
+    window.addEventListener('ctrl', (e) => this.handleCtrl(e.detail));
 
     window.addEventListener('keyup', (e) => {
       let code = e.code;
@@ -1367,6 +1421,8 @@ const Game = {
         else if (e.keyCode === 68) code = 'KeyD';
         else if (e.keyCode === 87) code = 'KeyW';
       }
+      if (code === 'KeyH') { this.applyAction(1, 'left', false); }
+      else if (code === 'KeyL') { this.applyAction(1, 'right', false); }
       this.keys[code] = false;
     });
 
@@ -1388,6 +1444,12 @@ const Game = {
     document.getElementById('dialog-action-btn').addEventListener('click', () => {
       this.advanceDialogue();
     });
+
+    // 2-player prompt buttons
+    const tpYes = document.getElementById('twoplayer-yes-btn');
+    const tpSolo = document.getElementById('twoplayer-solo-btn');
+    if (tpYes) tpYes.addEventListener('click', () => this.chooseTwoPlayer(true));
+    if (tpSolo) tpSolo.addEventListener('click', () => this.chooseTwoPlayer(false));
 
     // Audio HUD control
     document.getElementById('hud-sound-btn').addEventListener('click', () => {
@@ -1644,6 +1706,18 @@ const Game = {
     this.isPaused = false;
     this.isQuizCompleted = false;
 
+    // Reset co-op so a replay starts solo (and can be re-offered at Barney).
+    this.twoPlayer = false;
+    this.playerCount = 1;
+    this.twoPlayerPrompted = false;
+    this.p1Slot = null;
+    this.p2Slot = null;
+    this.keys2 = { left: false, right: false };
+    this.player2.active = false;
+    this.player2.isDead = false;
+    this.player2.role = 'husband';
+    this.skyQr = null;
+
     this.setupWorld();
     this.ensureLoop();
   },
@@ -1870,6 +1944,9 @@ const Game = {
     const lvlIdx = this.getLevelIndexAtX(this.player.x);
     this.player.outfit = this.getEllenOutfit(lvlIdx);
 
+    // --- PLAYER 2 (co-op) ---
+    if (this.player2.active) this.updateP2Physics(endX);
+
     // --- COMPANION TRAIL ENGINE ---
     // Handle Dog, Husband and Kids following Ellen in a chain
     this.updateCompanions(lvlIdx);
@@ -1878,7 +1955,24 @@ const Game = {
     // During the boss fight the camera locks to frame the whole arena + mountain
     // and zooms out; otherwise it follows the player.
     const inBossFight = this.bossActive && !this.bossDefeated;
-    const targetCamX = inBossFight ? (this.bossArenaStart - 170) : (this.player.x - this.width / 3);
+    let targetCamX;
+    if (inBossFight) {
+      targetCamX = this.bossArenaStart - 170;
+    } else if (this.twoPlayer && this.player2.active && !this.player2.isDead) {
+      // Co-op leash: frame both players at the midpoint and stop either from
+      // outrunning the other off-screen (a soft wall clamps the one in front).
+      const maxSep = (this.width / (this.viewZoom || 1)) - 220;
+      const dx = this.player.x - this.player2.x;
+      if (dx > maxSep) {
+        this.player.x = this.player2.x + maxSep; this.player.vx = 0;
+        if (wasmExports) wasmExports.player_x.value = this.player.x;
+      } else if (dx < -maxSep) {
+        this.player2.x = this.player.x + maxSep; this.player2.vx = 0;
+      }
+      targetCamX = (this.player.x + this.player2.x) / 2 - this.width / 2;
+    } else {
+      targetCamX = this.player.x - this.width / 3;
+    }
     this.camera.x += (targetCamX - this.camera.x) * 0.08;
     // Lock camera boundaries
     if (this.camera.x < 0) this.camera.x = 0;
@@ -1946,6 +2040,194 @@ const Game = {
   },
 
   // ============================================================
+  // PLAYER 2 / LOCAL CO-OP
+  // ============================================================
+
+  // Which character Player 2 drives at a given milestone: Barney until Preston
+  // is walking (lvlIdx 7), then Preston (Barney falls back to a follower).
+  p2Role(lvlIdx) {
+    return lvlIdx >= 7 ? 'kid1' : 'husband';
+  },
+
+  // Turn on co-op: activate Barney as an independent body just behind Ellen.
+  enableTwoPlayer() {
+    this.twoPlayer = true;
+    this.playerCount = 2;
+    const b = this.player2;
+    b.active = true;
+    b.role = this.p2Role(this.getLevelIndexAtX(this.player.x));
+    b.x = this.player.x - 40;
+    b.y = this.height - 80;
+    b.vx = 0; b.vy = 0; b.isGrounded = true; b.dir = 1;
+    b.health = b.maxHealth; b.isDead = false; b.invuln = 0;
+    b.attackTimer = 0; b.reviveTimer = 0;
+    b.yHistory = [];
+    this.p2Slot = null; // the next controller to send input becomes Player 2
+    this.skyQr = null;  // the pairing QR has done its job
+    this.rescaleEnemiesForTwoPlayers();
+  },
+
+  // Generic JS physics step for a body (mirrors Ellen's JS fallback, used for P2).
+  stepBody(b, walkLeft, walkRight, endX) {
+    if (walkLeft) { b.vx = -b.speed; b.dir = -1; b.animFrame++; }
+    else if (walkRight) { b.vx = b.speed; b.dir = 1; b.animFrame++; }
+    else { b.vx *= 0.7; if (Math.abs(b.vx) < 0.2) b.vx = 0; }
+    b.vy += b.gravity; b.y += b.vy; b.x += b.vx;
+    const groundY = this.height - 80;
+    if (b.y >= groundY) { b.y = groundY; b.vy = 0; b.isGrounded = true; }
+    if (b.x < 40) b.x = 40;
+    if (b.x > endX) b.x = endX;
+  },
+
+  jumpBody(b) {
+    if (!b || !b.active || b.isDead || !this.isRunning || this.isPaused) return;
+    if (b.isGrounded) { b.vy = b.jumpForce; b.isGrounded = false; AudioEngine.playJumpSFX(); }
+  },
+
+  updateP2Physics(endX) {
+    const b = this.player2;
+    if (!b.active) return;
+    // Hand off control across the story: Barney until Preston walks, then Preston.
+    const newRole = this.p2Role(this.getLevelIndexAtX(this.player.x));
+    if (newRole !== b.role) {
+      b.role = newRole;
+      b.x = this.player.x - (newRole === 'kid1' ? 90 : 40) * (this.player.dir || 1);
+      b.y = this.height - 80; b.vx = 0; b.vy = 0; b.isGrounded = true;
+    }
+    if (b.isDead) {
+      if (b.reviveTimer > 0) { b.reviveTimer--; if (b.reviveTimer === 0) this.reviveP2(); }
+      return;
+    }
+    const walkLeft = this.keys2.left ? 1 : 0;
+    const walkRight = this.keys2.right ? 1 : 0;
+    this.stepBody(b, walkLeft, walkRight, endX);
+    if (b.attackTimer > 0) b.attackTimer--;
+    if (b.invuln > 0) b.invuln--;
+    // jump-echo history (used later for the P2 soccer line)
+    if (!b.yHistory) b.yHistory = [];
+    b.yHistory.unshift(b.y - (this.height - 80));
+    if (b.yHistory.length > 24) b.yHistory.pop();
+    // Keep P2 inside the boss arena, like Ellen.
+    if (this.bossActive && !this.bossDefeated) {
+      const leftBound = this.bossArenaStart - 60;
+      if (b.x > this.bossWallX) { b.x = this.bossWallX; b.vx = 0; }
+      else if (b.x < leftBound) { b.x = leftBound; b.vx = 0; }
+    }
+  },
+
+  attackP2() {
+    const b = this.player2;
+    if (!b.active || b.isDead || !this.isRunning || this.isPaused) return;
+    if (b.attackTimer > 0) return;
+    // In co-op soccer, P2's chop kicks Barney's line instead of a melee chop.
+    if (this.soccerActive() && this.twoPlayer && this.soccerQueue2) {
+      this.kickSoccerForLine(1);
+      return;
+    }
+    b.attackType = 'karate';
+    b.attackMax = this.combat.karateDuration;
+    b.attackTimer = b.attackMax;
+    this._swingId2 = (this._swingId2 || 0) + 1;
+    this.shout2 = { text: 'Aya!', timer: b.attackMax + 10 }; // P2's karate yell
+    AudioEngine.playSlashSFX();
+  },
+
+  reviveP2() {
+    const b = this.player2;
+    b.isDead = false;
+    b.health = b.maxHealth;
+    b.invuln = this.combat.invulnFrames;
+    b.x = this.player.x - 40;
+    b.y = this.height - 80;
+    b.vx = 0; b.vy = 0; b.isGrounded = true;
+  },
+
+  // Route a controller action to a player. pIdx 0 = Ellen, 1 = Barney/Preston.
+  applyAction(pIdx, key, down) {
+    // While the 2-player prompt is up, ANY controller navigates/confirms it.
+    const tpPrompt = (typeof document !== 'undefined') && document.getElementById('twoplayer-prompt');
+    if (tpPrompt && tpPrompt.classList.contains('active')) {
+      if (!down) return;
+      if (key === 'left' || key === 'ArrowLeft' || key === 'right' || key === 'ArrowRight') {
+        this.twoPlayerFocusIndex = this.twoPlayerFocusIndex === 0 ? 1 : 0;
+        this.updateTwoPlayerFocus();
+      } else if (key === 'chop' || key === 'brake' || key === 'Enter' ||
+                 key === 'jump' || key === 'thrust' || key === ' ' || key === 'Space') {
+        this.chooseTwoPlayer(this.twoPlayerFocusIndex === 0);
+      }
+      return;
+    }
+    const isLeft  = key === 'left'  || key === 'ArrowLeft';
+    const isRight = key === 'right' || key === 'ArrowRight';
+    const isJump  = key === 'jump'  || key === 'thrust' || key === ' ' || key === 'Space';
+    const isChop  = key === 'chop'  || key === 'brake'  || key === 'Enter';
+    if (pIdx === 0) {
+      if (isLeft) this.keys['ArrowLeft'] = down;
+      else if (isRight) this.keys['ArrowRight'] = down;
+      else if (isJump) { if (down) this.jump(); }
+      else if (isChop && down) {
+        if (this.isPaused && this.activeDialog) this.advanceDialogue();
+        else this.attack();
+      }
+    } else {
+      this.maybePromoteCoop(); // desktop P2 keys also bring Barney into co-op
+      if (isLeft) this.keys2.left = down;
+      else if (isRight) this.keys2.right = down;
+      else if (isJump) this.jumpBody(this.player2);
+      else if (isChop && down) this.attackP2();
+    }
+  },
+
+  // A tagged controller event from the native bridge: {action, key, slot}.
+  // Solo → everything drives Ellen. 2P → the first distinct slot after enabling
+  // co-op claims Player 2; that slot drives Barney, all others drive Ellen.
+  // Once Ellen has met Barney, the first controller input promotes co-op (so the
+  // phone reliably becomes Player 2 even if the "connected" signal was missed).
+  maybePromoteCoop() {
+    if (!this.twoPlayer && this.seatedBarney && this.seatedBarney.joined) {
+      this.enableTwoPlayer();
+    }
+  },
+
+  handleCtrl(detail) {
+    if (!detail) return;
+    const slot = detail.slot;
+    const down = detail.action === 'keydown';
+    if (slot != null) this.maybePromoteCoop();
+    let pIdx = 0;
+    if (this.twoPlayer && slot != null) {
+      if (this.p2Slot == null && slot !== this.p1Slot) this.p2Slot = slot;
+      if (slot === this.p2Slot) pIdx = 1;
+      else if (this.p1Slot == null) this.p1Slot = slot;
+    }
+    this.applyAction(pIdx, detail.key, down);
+  },
+
+  // Two players = roughly double the DPS, so bump the foes still ahead of the
+  // party: some gain a hit point (cap tier 3) and the ranks thicken with extra
+  // spawns. Only touches enemies ahead of Ellen so already-cleared ground is
+  // left alone. (Called when co-op is enabled — Ellen is near the very start,
+  // so almost every foe is still ahead.)
+  rescaleEnemiesForTwoPlayers() {
+    if (this.playerCount < 2 || !this.enemies) return;
+    const px = this.player.x;
+    const extra = [];
+    this.enemies.forEach(e => {
+      if (!e.alive || e.x <= px + 100) return; // only foes still ahead
+      if (Math.random() < 0.5) {
+        const nt = Math.min(3, (e.maxHp || e.tier || 1) + 1);
+        e.tier = nt; e.hp = nt; e.maxHp = nt;
+      }
+      if (Math.random() < 0.35) {
+        const nx = e.x + 60 + Math.random() * 40;
+        extra.push({ ...e, x: nx, homeX: nx, hp: e.maxHp, maxHp: e.maxHp,
+          lastSwingHit: -1, hitFlash: 0, frame: (Math.random() * 60) | 0 });
+      }
+    });
+    if (extra.length) this.enemies.push(...extra);
+  },
+
+  // ============================================================
   // COMBAT SYSTEMS
   // ============================================================
   attack() {
@@ -1989,31 +2271,46 @@ const Game = {
     return this.soccerActive() && this.soccerQueue && this.soccerQueue.length > 0;
   },
 
-  // Kick a soccer ball. In the gauntlet the FRONT of the line kicks, then the
-  // circular queue rotates (front jogs to the back). In the boss fight Ellen
-  // keeps normal control and kicks the ball herself.
-  kickSoccerBall() {
-    const dir = this.player.dir;
-    this.player.attackType = 'karate';
-    this.player.attackMax = this.combat.karateDuration;
-    this.player.attackTimer = this.player.attackMax;
+  // Build the kicking line(s) when the soccer ball is grabbed. Solo = one family
+  // line; co-op splits into Ellen's line (Ellen, Blaire, Mochi) and Barney's line
+  // (Barney, Preston) so each player kicks their own.
+  setupSoccerLines() {
+    if (this.twoPlayer && this.player2.active) {
+      this.soccerQueue  = ['player', 'kid2', 'dog'];
+      this.soccerQueue2 = ['husband', 'kid1'];
+    } else {
+      this.soccerQueue  = ['player', 'husband', 'kid1', 'kid2', 'dog'];
+      this.soccerQueue2 = null;
+    }
+    this.soccerPos = {}; this.soccerPos2 = {};
+    this._soccerJog1 = { id: null, t: 0 };
+    this._soccerJog2 = { id: null, t: 0 };
+  },
+
+  // Kick from a line: the FRONT member kicks, then the circular queue rotates
+  // (kicker jogs to the back). idx 0 = Ellen's line (Player 1), 1 = Barney's (P2).
+  kickSoccerForLine(idx) {
+    const lead = idx === 0 ? this.player : this.player2;
+    const queue = idx === 0 ? this.soccerQueue : this.soccerQueue2;
+    const pos = idx === 0 ? this.soccerPos : this.soccerPos2;
+    const jog = idx === 0 ? this._soccerJog1 : this._soccerJog2;
+    const dir = lead.dir;
+    lead.attackType = 'karate';
+    lead.attackMax = this.combat.karateDuration;
+    lead.attackTimer = lead.attackMax;
 
     let spawnX, spawnY;
-    if (this.soccerFormationActive()) {
-      const who = this.soccerQueue[0];
-      const baseX = (this.soccerPos && this.soccerPos[who] != null) ? this.soccerPos[who] : this.player.x;
+    if (queue && queue.length) {
+      const who = queue[0];
+      const baseX = (pos && pos[who] != null) ? pos[who] : lead.x;
       spawnX = baseX + dir * 16;
-      // The front kicker follows the player's jump (formation draws it at
-      // player.y), so launch the ball from there — not the ground.
-      spawnY = this.player.y - 18;
+      spawnY = lead.y - 18;
       if (this.hopTimers && who !== 'player') this.hopTimers[who] = 15; // kick hop
-      // Rotate the circular queue: the kicker moves to the back.
-      this.soccerQueue.push(this.soccerQueue.shift());
-      this.soccerJogId = who;
-      this.soccerJogT = 22; // animate the jog to the back
+      queue.push(queue.shift()); // rotate: kicker → back
+      if (jog) { jog.id = who; jog.t = 22; }
     } else {
-      spawnX = this.player.x + dir * 22;
-      spawnY = this.player.y - 18;
+      spawnX = lead.x + dir * 22;
+      spawnY = lead.y - 18;
     }
 
     this.projectiles.push({
@@ -2023,6 +2320,9 @@ const Game = {
     });
     AudioEngine.playShootSFX();
   },
+
+  // Ellen's kick (Player 1).
+  kickSoccerBall() { this.kickSoccerForLine(0); },
 
   // Apply damage to an enemy. Tougher (2-hit) monsters flash when hurt but
   // survive until their hp runs out.
@@ -2067,7 +2367,7 @@ const Game = {
       homeX: 37830, x: 37830,
       baseY: 170, y: 90,
       w: 120, h: 120,
-      hp: 12, maxHp: 12,
+      hp: 12 * (this.playerCount === 2 ? 2 : 1), maxHp: 12 * (this.playerCount === 2 ? 2 : 1),
       alive: true, dir: -1, frame: 0,
       hitFlash: 0, lastSwingHit: -1,
       shootTimer: 110,
@@ -2159,6 +2459,12 @@ const Game = {
     if (Math.abs(b.x - this.player.x) < b.w * 0.35 && Math.abs(b.y - playerMidY) < b.h * 0.35) {
       this.damagePlayer();
     }
+    if (this.player2.active && !this.player2.isDead) {
+      const p2MidY = this.player2.y - 28;
+      if (Math.abs(b.x - this.player2.x) < b.w * 0.35 && Math.abs(b.y - p2MidY) < b.h * 0.35) {
+        this.damageBody(this.player2);
+      }
+    }
   },
 
   bossShoot(enraged) {
@@ -2242,20 +2548,34 @@ const Game = {
     return best;
   },
 
-  damagePlayer() {
-    if (this.player.invuln > 0 || this.player.isDead) return;
-    this.player.health -= 1;
-    this.player.invuln = this.combat.invulnFrames;
+  // Damage either body. Ellen (P1) KO ends the game; Player 2 KO just sits out
+  // and revives next to Ellen (co-op stays forgiving).
+  damageBody(body) {
+    if (!body || body.invuln > 0 || body.isDead) return;
+    body.health -= 1;
+    body.invuln = this.combat.invulnFrames;
     AudioEngine.playHurtSFX();
-    // Knockback away from facing direction
-    const kb = -this.player.dir * 6;
-    this.player.vx = kb;
-    if (wasmExports) wasmExports.player_vx.value = kb;
-    if (this.player.health <= 0) {
-      this.player.health = 0;
-      this.triggerGameOver();
+    const kb = -body.dir * 6;
+    body.vx = kb;
+    if (body === this.player) {
+      if (wasmExports) wasmExports.player_vx.value = kb;
+      if (body.health <= 0) {
+        body.health = 0;
+        this.triggerGameOver();
+      }
+    } else {
+      // Player 2: knocked out → revive after a short delay (never a game over).
+      if (body.health <= 0) {
+        body.health = 0;
+        body.isDead = true;
+        body.reviveTimer = 180; // ~3s at 60fps
+        body.vx = 0;
+      }
     }
   },
+
+  // Back-compat: existing call sites damage Ellen.
+  damagePlayer() { this.damageBody(this.player); },
 
   updateCombat() {
     const groundY = this.height - 80;
@@ -2274,6 +2594,7 @@ const Game = {
     if (this.player.attackTimer > 0) this.player.attackTimer--;
     if (this.player.serveCooldown > 0) this.player.serveCooldown--;
     if (this.shout && this.shout.timer > 0) this.shout.timer--;
+    if (this.shout2 && this.shout2.timer > 0) this.shout2.timer--;
     if (this.player.invuln > 0) this.player.invuln--;
     if (this.banner && this.banner.timer > 0) this.banner.timer--;
 
@@ -2300,8 +2621,7 @@ const Game = {
           };
         } else if (pk.kind === 'soccer') {
           this.player.hasSoccer = true;
-          this.soccerQueue = ['player', 'husband', 'kid1', 'kid2', 'dog'];
-          this.soccerPos = {};
+          this.setupSoccerLines();
           this.banner = {
             timer: 320,
             text: '⚽ Soccer ball! The family lines up — kick it at the foes, taking turns!'
@@ -2327,6 +2647,18 @@ const Game = {
         }
         t.squash = 1;
         AudioEngine.playBounceSFX();
+      }
+      // Player 2 can super-bounce too
+      const b2 = this.player2;
+      if (b2.active && !b2.isDead) {
+        const onPad2 = Math.abs(b2.x - t.x) < t.w / 2;
+        if (onPad2 && b2.vy >= 0 && b2.y >= t.y - 14 && b2.y <= t.y + 8) {
+          b2.vy = this.combat.trampolineForce;
+          b2.y = t.y - 16;
+          b2.isGrounded = false;
+          t.squash = 1;
+          AudioEngine.playBounceSFX();
+        }
       }
     });
 
@@ -2364,6 +2696,10 @@ const Game = {
       // Contact damage
       if (Math.abs(e.x - this.player.x) < 24 && Math.abs(e.y - playerMidY) < 30) {
         this.damagePlayer();
+      }
+      if (this.player2.active && !this.player2.isDead &&
+          Math.abs(e.x - this.player2.x) < 24 && Math.abs(e.y - (this.player2.y - 28)) < 30) {
+        this.damageBody(this.player2);
       }
     });
 
@@ -2411,6 +2747,35 @@ const Game = {
         const dx = (e.x - this.player.x) * dir; // >0 = in front
         if (dx > -12 && dx < hReach && Math.abs(e.y - playerMidY) < vReach) {
           e.lastSwingHit = this._swingId;
+          this.hitEnemy(e, 1);
+        }
+      });
+    }
+
+    // --- Player 2 (co-op) karate melee — hits enemies and the boss too ---
+    // Uses a distinct 'p2_' swing-id namespace so a P2 swing and a P1 swing each
+    // land independently on the same target.
+    const p2b = this.player2;
+    if (p2b.active && !p2b.isDead && p2b.attackTimer > 0 && !this.soccerActive()) {
+      const dir2 = p2b.dir;
+      const p2MidY = p2b.y - 28;
+      const hR = this.combat.karateReach;
+      const vR = this.combat.karateVReach;
+      const sid2 = 'p2_' + this._swingId2;
+      if (this.boss && this.boss.alive && this.boss.lastSwingHit !== sid2) {
+        const bo = this.boss;
+        const dxb = (bo.x - p2b.x) * dir2;
+        if (dxb > -30 && dxb < hR + 40 && Math.abs(bo.y - p2MidY) < vR + 24) {
+          this.boss.lastSwingHit = sid2;
+          this.hitBoss(1);
+        }
+      }
+      this.enemies.forEach(e => {
+        if (!e.alive) return;
+        if (e.lastSwingHit === sid2) return;
+        const dxe = (e.x - p2b.x) * dir2;
+        if (dxe > -12 && dxe < hR && Math.abs(e.y - p2MidY) < vR) {
+          e.lastSwingHit = sid2;
           this.hitEnemy(e, 1);
         }
       });
@@ -2525,6 +2890,10 @@ const Game = {
       } else if (Math.abs(p.x - this.player.x) < 20 && Math.abs(p.y - playerMidY) < 28) {
         p.alive = false;
         this.damagePlayer();
+      } else if (this.player2.active && !this.player2.isDead &&
+                 Math.abs(p.x - this.player2.x) < 20 && Math.abs(p.y - (this.player2.y - 28)) < 28) {
+        p.alive = false;
+        this.damageBody(this.player2);
       }
     });
     if (this.enemyProjectiles.length) {
@@ -2672,6 +3041,12 @@ const Game = {
       return groundY + (h[Math.min(delayFrames, h.length - 1)] || 0);
     };
 
+    // In co-op, whichever character Player 2 is driving is drawn as the P2 body,
+    // so skip it here (otherwise it'd appear twice — once controlled, once trailing).
+    const p2On = this.twoPlayer && this.player2.active;
+    const p2IsHusband = p2On && this.player2.role === 'husband';
+    const p2IsKid1 = p2On && this.player2.role === 'kid1';
+
     // 1. Dog joins once we've adopted Mochi (index 2) onward
     if (lvlIdx >= 2) {
       this.companions.push({
@@ -2684,9 +3059,10 @@ const Game = {
       });
     }
 
-    // 2. Husband (Barney) joins at the Dating milestone (index 0) onward,
-    //    but only after Ellen has walked up to him sitting on his chair.
-    if (this.player.x >= this.levels[0].x && this.seatedBarney && this.seatedBarney.joined) {
+    // 2. Husband (Barney) joins once Ellen has walked up to him on his chair.
+    //    Gated purely on `joined` (not player.x) so the walking companion appears
+    //    the instant he stands — no gap between the seated sprite and the walker.
+    if (this.seatedBarney && this.seatedBarney.joined && !p2IsHusband) {
       this.companions.push({
         type: 'husband',
         x: this.player.x - 30 * this.player.dir,
@@ -2706,14 +3082,17 @@ const Game = {
         offset = 90;
       }
 
-      this.companions.push({
-        type: kidType,
-        x: this.player.x - offset * this.player.dir,
-        y: echoY(9),
-        outfit: 'casual',
-        frame: frame,
-        dir: this.player.dir
-      });
+      // Skip Preston here when Player 2 is driving him.
+      if (!(p2IsKid1 && kidType === 'kid1')) {
+        this.companions.push({
+          type: kidType,
+          x: this.player.x - offset * this.player.dir,
+          y: echoY(9),
+          outfit: 'casual',
+          frame: frame,
+          dir: this.player.dir
+        });
+      }
     }
 
     // 4. Child 2 (Blaire) joins at her birth (index 8, crawling baby), toddler from the next milestone
@@ -3169,13 +3548,177 @@ const Game = {
     this.updateSeatedBarney();
   },
 
-  // Barney sits on a chair at the Dating milestone until Ellen walks up to him
+  // Barney sits on a chair at the Dating milestone. When Ellen walks up to him
+  // we pause once and offer 2-player co-op (or continue solo).
   updateSeatedBarney() {
     if (!this.seatedBarney || this.seatedBarney.joined) return;
     const dist = Math.abs(this.player.x - this.seatedBarney.x);
-    if (dist < 50) {
-      this.seatedBarney.joined = true; // he stands up and joins as companion
+    if (dist < 50) this.meetBarney();
+  },
+
+  // Ellen reaches Barney: he stands and joins as a follower, and a pairing QR
+  // appears floating in the sky near him — no pause. A second player can scan it
+  // any time to take control of Barney.
+  meetBarney() {
+    if (this.seatedBarney) this.seatedBarney.joined = true;
+    this.armPlayer2Pairing();
+    this.launchSkyQr();
+  },
+
+  armPlayer2Pairing() {
+    try {
+      if (window.AndroidBridge) {
+        if (AndroidBridge.beginPlayer2Pairing) AndroidBridge.beginPlayer2Pairing();
+        if (AndroidBridge.getQrDataUrl) this.setPairingQr(AndroidBridge.getQrDataUrl());
+      } else {
+        this.connectP2Relay(); // relay replies with the QR + controller events
+      }
+    } catch (e) { /* keyboard P2 still works */ }
+  },
+
+  setPairingQr(dataUrl) {
+    if (!dataUrl) return;
+    this._pairingQrUrl = dataUrl;
+    if (!this._pairingQrImg || this._pairingQrImg.src !== dataUrl) {
+      const img = new Image();
+      this._pairingQrReady = false;
+      img.onload = () => { this._pairingQrReady = true; };
+      img.src = dataUrl;
+      this._pairingQrImg = img;
     }
+  },
+
+  launchSkyQr() {
+    // Persistent, world-anchored card just LEFT of Barney's chair — kept clear of
+    // the Dating memory polaroid (which floats over the milestone to the right).
+    // Like a floating memory card it appears/disappears by position and gently
+    // bobs in place — it does NOT rise away or time out. Removed once P2 joins.
+    this.skyQr = {
+      x: (this.seatedBarney ? this.seatedBarney.x : this.player.x) - 110,
+      baseY: 120,
+    };
+  },
+
+  drawSkyQr(camX) {
+    const q = this.skyQr;
+    if (!q) return;
+    const ctx = this.ctx;
+    // Fade in/out by Ellen's distance from the card (positional, like the memory
+    // banners) — never a timed fade.
+    const dist = Math.abs(this.player.x - q.x);
+    const alpha = Math.max(0, Math.min(1, (820 - dist) / 200));
+    if (alpha <= 0.02) return;
+    const rx = q.x - camX;
+    if (rx < -160 || rx > this.width + 160) return;
+    const bob = Math.sin(Date.now() * 0.0018) * 6;
+    const sway = Math.cos(Date.now() * 0.0011) * 4;
+    const size = 92, pad = 7, cardW = 150, cardH = size + pad * 2 + 20;
+    const cx = rx + sway, cy = q.baseY + bob;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // card
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.fillRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH);
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH);
+    // QR (or a placeholder while it loads / on a setup with no transport)
+    const qx = cx - size / 2, qy = cy - cardH / 2 + pad;
+    if (this._pairingQrImg && this._pairingQrReady) {
+      ctx.drawImage(this._pairingQrImg, qx, qy, size, size);
+    } else {
+      ctx.fillStyle = '#eeeeee';
+      ctx.fillRect(qx, qy, size, size);
+    }
+    // caption
+    ctx.fillStyle = '#222';
+    ctx.font = '700 11px Outfit';
+    ctx.textAlign = 'center';
+    ctx.fillText('📲 Scan to play as Barney!', cx, cy + cardH / 2 - 6);
+    ctx.restore();
+  },
+
+  // A phone controller connected — promote co-op so Barney becomes Player 2.
+  onPlayer2Connected() {
+    if (!this.twoPlayer) this.enableTwoPlayer();
+  },
+
+  showTwoPlayerPrompt() {
+    this.isPaused = true;
+    this.player.vx = 0;
+    if (wasmExports) wasmExports.player_vx.value = 0;
+    this.twoPlayerFocusIndex = 0;
+    const el = document.getElementById('twoplayer-prompt');
+    if (el) el.classList.add('active');
+
+    // Surface the pairing QR so Player 2 can scan to join as Barney.
+    const qr = document.getElementById('twoplayer-qr');
+    if (qr) qr.innerHTML = '';
+    try {
+      if (window.AndroidBridge) {
+        // Android TV build: native hosts the WS server + generates the QR.
+        if (AndroidBridge.beginPlayer2Pairing) AndroidBridge.beginPlayer2Pairing();
+        if (AndroidBridge.getQrDataUrl) this.showP2Qr(AndroidBridge.getQrDataUrl());
+      } else {
+        // Desktop: connect to the local relay (npm run dev); it replies with the QR.
+        this.connectP2Relay();
+      }
+    } catch (e) { /* no controller transport — Player 2 can still use the keyboard (H/L/U/O) */ }
+
+    this.updateTwoPlayerFocus();
+  },
+
+  showP2Qr(dataUrl) {
+    const qr = document.getElementById('twoplayer-qr');
+    if (!qr || !dataUrl) return;
+    qr.innerHTML = '<img alt="Scan to join as Player 2" src="' + dataUrl +
+      '" style="width:150px;height:150px;border-radius:8px;background:#fff;padding:6px;">';
+  },
+
+  // Desktop only: connect to tools/p2-relay.js as the "game" client. The relay
+  // sends us the pairing QR and forwards phone-controller input here, which we
+  // feed straight into handleCtrl (same path the Android native injection uses).
+  connectP2Relay() {
+    if (window.AndroidBridge) return;
+    if (this._p2ws && this._p2ws.readyState <= 1) return; // connecting or open
+    try {
+      const host = location.hostname || '127.0.0.1';
+      const ws = new WebSocket('ws://' + host + ':8081');
+      this._p2ws = ws;
+      ws.onopen = () => { try { ws.send(JSON.stringify({ role: 'game' })); } catch (e) {} };
+      ws.onmessage = (ev) => {
+        let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+        if (m.type === 'pairing') { this.setPairingQr(m.qr); return; }
+        if (m.type === 'controller') { if (m.state === 'connected') this.onPlayer2Connected(); return; }
+        if (m.action && m.key != null) this.handleCtrl(m);
+      };
+      ws.onclose = () => { this._p2ws = null; };
+      ws.onerror = () => {};
+    } catch (e) { /* relay not running — keyboard P2 still works */ }
+  },
+
+  // yes = start co-op; either way Barney is now "acquired".
+  chooseTwoPlayer(yes) {
+    const el = document.getElementById('twoplayer-prompt');
+    if (el) el.classList.remove('active');
+    const qr = document.getElementById('twoplayer-qr');
+    if (qr) qr.innerHTML = '';
+    if (this.seatedBarney) this.seatedBarney.joined = true;
+    if (yes) {
+      this.enableTwoPlayer();
+    } else {
+      try { if (window.AndroidBridge && AndroidBridge.cancelPlayer2Pairing) AndroidBridge.cancelPlayer2Pairing(); } catch (e) {}
+    }
+    this.isPaused = false;
+    if (this.canvas) this.canvas.focus();
+  },
+
+  updateTwoPlayerFocus() {
+    const ids = ['twoplayer-yes-btn', 'twoplayer-solo-btn'];
+    ids.forEach((id, i) => {
+      const b = document.getElementById(id);
+      if (b) b.classList.toggle('focused', i === (this.twoPlayerFocusIndex || 0));
+    });
   },
 
   drawFarmAnimals(camX) {
@@ -3220,7 +3763,7 @@ const Game = {
     if (this.seatedBarney && !this.seatedBarney.joined) {
       const brx = this.seatedBarney.x - camX;
       if (brx > -60 && brx < this.width + 60) {
-        Assets.drawSeatedHusband(this.ctx, brx, this.seatedBarney.y, 'casual', this.seatedBarney.dir);
+        Assets.drawSeatedHusband(this.ctx, brx, this.seatedBarney.y, 'red_vneck', this.seatedBarney.dir);
       }
     }
   },
@@ -3855,10 +4398,39 @@ const Game = {
       }
     }
 
+    // Draw Player 2 (Barney, or Preston once he's walking) in co-op — an
+    // independent body with its own karate chop. (Soccer split handled separately.)
+    if (this.player2.active && !this.player2.isDead && !soccerForm) {
+      const b = this.player2;
+      const p2blink = b.invuln > 0 && Math.floor(b.invuln / 4) % 2 === 0;
+      if (!p2blink) {
+        const b2x = b.x - camX;
+        if (b2x > -60 && b2x < this.width + 60) {
+          const shouting2 = b.attackTimer > 0; // open mouth mid karate chop
+          if (b.role === 'kid1') {
+            Assets.drawKid(this.ctx, b2x, b.y, 'kid1', b.animFrame, b.dir, lvlIdx, shouting2);
+          } else {
+            Assets.drawHusband(this.ctx, b2x, b.y, this.getHusbandOutfit(lvlIdx), b.animFrame, b.dir, 1, shouting2);
+          }
+          if (b.attackTimer > 0) {
+            const prog2 = 1 - b.attackTimer / (b.attackMax || this.combat.karateDuration);
+            Assets.drawKarateChop(this.ctx, b2x + b.dir * 24, b.y - 24, b.dir, prog2);
+          }
+          // "Aya!" speech bubble while shouting
+          if (this.shout2 && this.shout2.timer > 0) {
+            Assets.drawSpeechBubble(this.ctx, b2x + b.dir * 10, b.y - 80, this.shout2.text);
+          }
+        }
+      }
+    }
+
     // Soccer: the gauntlet draws the whole family as a circular kicking line;
     // during the boss fight Ellen keeps normal control and just dribbles a ball.
     if (soccerForm) {
-      this.drawSoccerLine(camX, lvlIdx);
+      this.drawSoccerLine(camX, lvlIdx, this.player, this.soccerQueue, this.soccerPos, this._soccerJog1);
+      if (this.twoPlayer && this.soccerQueue2 && this.soccerQueue2.length) {
+        this.drawSoccerLine(camX, lvlIdx, this.player2, this.soccerQueue2, this.soccerPos2, this._soccerJog2);
+      }
     } else if (this.soccerActive()) {
       const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
       Assets.drawSoccerBall(this.ctx, pX + this.player.dir * 16, this.player.y - 6 - bob, Date.now() * 0.02);
@@ -3867,41 +4439,44 @@ const Game = {
     // Wedding confetti rains over everything
     this.drawConfetti(camX);
 
+    // The "play as Barney" pairing QR floating up into the sky
+    this.drawSkyQr(camX);
+
     // HUD is drawn by the main loop (outside the zoom transform), not here.
   },
 
   // The circular kicking queue rendered as a physical line: the front member is
   // the kicker (with the dribble ball + a name marker). After a kick the queue
   // rotates and the ex-kicker jogs to the back while everyone shifts forward.
-  drawSoccerLine(camX, lvlIdx) {
-    const q = this.soccerQueue;
-    if (!q || !q.length) return;
-    if (!this.soccerPos) this.soccerPos = {};
+  // Draws one kicking line anchored to `lead` (player or player2), using its own
+  // queue, position map and jog state — so co-op can render two independent lines.
+  drawSoccerLine(camX, lvlIdx, lead, queue, pos, jog) {
+    const q = queue;
+    if (!q || !q.length || !pos) return;
     const groundY = this.height - 80;
-    const dir = this.player.dir;
+    const dir = lead.dir;
     const spacing = 48;
-    const frame = this.player.animFrame;
-    // Echo the player's jump down the line (front follows it exactly, the rest
+    const frame = lead.animFrame;
+    // Echo the lead's jump down the line (front follows it exactly, the rest
     // ripple a few frames behind — so jumping is visible again).
-    const hist = this.player.yHistory || [];
-    // Flash the whole family while invulnerable after a hit — same damage
-    // feedback as Ellen's blink in karate/racket mode.
-    const blink = this.player.invuln > 0 && Math.floor(this.player.invuln / 4) % 2 === 0;
-    if (this.soccerJogT > 0) this.soccerJogT--;
+    const hist = lead.yHistory || [];
+    // Flash the whole line while the lead is invulnerable after a hit.
+    const blink = lead.invuln > 0 && Math.floor(lead.invuln / 4) % 2 === 0;
+    if (jog && jog.t > 0) jog.t--;
 
     q.forEach((id, i) => {
-      const targetX = this.player.x - dir * i * spacing; // slot i; front (i=0) = controlled x
-      if (this.soccerPos[id] == null) this.soccerPos[id] = targetX;
-      this.soccerPos[id] += (targetX - this.soccerPos[id]) * 0.18;
+      const targetX = lead.x - dir * i * spacing; // slot i; front (i=0) = lead's x
+      if (pos[id] == null) pos[id] = targetX;
+      pos[id] += (targetX - pos[id]) * 0.18;
 
       let drawY = groundY + (hist[Math.min(i * 3, hist.length - 1)] || 0);
-      if (id === this.soccerJogId && this.soccerJogT > 0) {
-        drawY -= Math.sin((1 - this.soccerJogT / 22) * Math.PI) * 22; // jog-to-back arc
+      if (jog && id === jog.id && jog.t > 0) {
+        drawY -= Math.sin((1 - jog.t / 22) * Math.PI) * 22; // jog-to-back arc
       }
       const hop = this.hopTimers ? this.hopTimers[id] : 0;
       if (hop > 0) drawY -= 22 * Math.sin((hop / 15) * Math.PI);
 
-      const rx = this.soccerPos[id] - camX;
+      const rx = pos[id] - camX;
       if (rx < -70 || rx > this.width + 70) return;
       if (blink) return; // flash out this frame while invulnerable
       if (id === 'player') {
@@ -3917,7 +4492,7 @@ const Game = {
 
     // Dribble ball + name marker on the front kicker (also blinks while hit)
     const front = q[0];
-    const fx = this.soccerPos[front];
+    const fx = pos[front];
     if (fx != null && !blink) {
       const frontY = groundY + (hist[0] || 0); // follow the jump
       const bob = Math.abs(Math.sin(Date.now() * 0.012)) * 4;
@@ -4060,6 +4635,24 @@ const Game = {
     const heartSize = 16, heartGap = 20, hRowX = 22, hRowY = 26;
     for (let i = 0; i < this.player.maxHealth; i++) {
       this.drawHeartIcon(hRowX + i * heartGap, hRowY, heartSize, i < this.player.health);
+    }
+
+    // --- Player 2 (Barney/Preston) health: right next to Ellen's, same row ---
+    if (this.twoPlayer && this.player2.active) {
+      const b = this.player2;
+      const rowW1 = (this.player.maxHealth - 1) * heartGap + heartSize;
+      const gx = hRowX + rowW1 + 26; // gap after Ellen's row
+      // little divider between the two health bars
+      this.ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      this.ctx.fillRect(gx - 14, hRowY - 7, 2, 15);
+      for (let i = 0; i < b.maxHealth; i++) {
+        this.drawHeartIcon(gx + i * heartGap, hRowY, heartSize, !b.isDead && i < b.health);
+      }
+      // name tag under Barney's hearts
+      this.ctx.fillStyle = '#fff';
+      this.ctx.font = '600 10px Outfit';
+      this.ctx.textAlign = 'left';
+      this.ctx.fillText(b.isDead ? 'Reviving…' : (b.role === 'kid1' ? 'Preston' : 'Barney'), gx, hRowY + 15);
     }
 
     // --- Weapon badge --- (just below the heart row, top-left)

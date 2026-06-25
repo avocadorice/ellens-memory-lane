@@ -6,11 +6,13 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.util.Base64
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -49,6 +51,15 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
     private var gamepad: GamepadServer? = null
     private var http: ControllerHttpServer? = null
     private var overlayVisible = false
+    private var pairingWsUrl: String = ""
+
+    // Co-op Player 2 routing. The game calls beginPlayer2Pairing() (via the
+    // AndroidBridge JS interface) when the "2 Players" prompt opens; the next phone
+    // to connect is then bound as Player 2 and its input is delivered as slot-tagged
+    // 'ctrl' CustomEvents. Every other controller (and the TV remote) stays Player 1
+    // and keeps driving the game + UI through synthesised key events, as before.
+    @Volatile private var p2Conn: WebSocket? = null
+    @Volatile private var expectingP2 = false
 
     companion object {
         private const val GAME_URL = "https://avocadorice.github.io/ellens-memory-lane/"
@@ -82,6 +93,9 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
         }
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = WebChromeClient()
+        // Lets the game ask for the pairing QR + arm Player-2 pairing at the husband
+        // milestone (see the 2-player prompt in game.js).
+        webView.addJavascriptInterface(WebBridge(), "AndroidBridge")
 
         root = FrameLayout(this)
         root.addView(
@@ -112,6 +126,7 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
         // The ChillStick app scans this QR and connects straight to the WebSocket;
         // it expects a bare ws:// address.
         val wsUrl = "ws://$ip:$WS_PORT"
+        pairingWsUrl = wsUrl
         urlLabel.text = wsUrl
         qrImage.setImageBitmap(makeQr(wsUrl, 640))
 
@@ -128,10 +143,23 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
     }
 
     override fun onClientConnected(conn: WebSocket) {
+        // If the game is waiting for Player 2, the first phone to connect claims it
+        // and we tell the game so Barney is promoted to Player 2.
+        if (expectingP2 && p2Conn == null) {
+            p2Conn = conn
+            expectingP2 = false
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "try{ if (Game && Game.onPlayer2Connected) Game.onPlayer2Connected(); }catch(e){}",
+                    null,
+                )
+            }
+        }
         runOnUiThread { hideOverlay() }
     }
 
     override fun onClientDisconnected(conn: WebSocket) {
+        if (conn == p2Conn) p2Conn = null
         // Make sure no key is left stuck "down" if the phone drops mid-press.
         runOnUiThread { releaseAllKeys() }
     }
@@ -167,7 +195,16 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
                 "chop", "brake" -> "Enter"
                 else -> ""
             }
-            injectKey(action, keyCode, keyName)
+            if (conn == p2Conn) {
+                // Player 2 (co-op): gameplay-only input, tagged slot 1. The game
+                // routes it to Barney/Preston; raw key names (left/right/jump/chop/
+                // thrust/brake) are normalised game-side.
+                injectCtrl(action, key, 1)
+            } else {
+                // Player 1 (and all menu/UI navigation): synthesise a real key event,
+                // exactly as before.
+                injectKey(action, keyCode, keyName)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -176,6 +213,12 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
     private fun injectKey(action: String, keyCode: Int, keyName: String) {
         val js = "window.dispatchEvent(new KeyboardEvent('$action', " +
             "{ keyCode: $keyCode, which: $keyCode, key: '$keyName', bubbles: true, cancelable: true }));"
+        runOnUiThread { webView.evaluateJavascript(js, null) }
+    }
+
+    private fun injectCtrl(action: String, key: String, slot: Int) {
+        val js = "window.dispatchEvent(new CustomEvent('ctrl', " +
+            "{ detail: { action: '$action', key: '$key', slot: $slot } }));"
         runOnUiThread { webView.evaluateJavascript(js, null) }
     }
 
@@ -348,6 +391,40 @@ class MainActivity : Activity(), GamepadServer.ServerListener {
             }
         }
         return bmp
+    }
+
+    // ---- JS ↔ native bridge (2-player pairing) ---------------------------
+
+    inner class WebBridge {
+        @JavascriptInterface
+        fun isAndroid(): Boolean = true
+
+        // Arm Player-2 pairing: the next phone to connect becomes Player 2.
+        @JavascriptInterface
+        fun beginPlayer2Pairing() {
+            expectingP2 = true
+        }
+
+        // Cancel pairing (e.g. the player chose "Continue Solo").
+        @JavascriptInterface
+        fun cancelPlayer2Pairing() {
+            expectingP2 = false
+        }
+
+        // The pairing QR as a PNG data URL, so the web 2-player prompt can show it
+        // inline (no native overlay covering the prompt's buttons).
+        @JavascriptInterface
+        fun getQrDataUrl(): String {
+            return try {
+                val url = if (pairingWsUrl.isNotEmpty()) pairingWsUrl else "ws://127.0.0.1:$WS_PORT"
+                val bmp = makeQr(url, 320)
+                val baos = java.io.ByteArrayOutputStream()
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                "data:image/png;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+            } catch (e: Exception) {
+                ""
+            }
+        }
     }
 
     // ---- Input routing ---------------------------------------------------
