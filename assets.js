@@ -392,7 +392,7 @@ const Assets = {
     }
 
     // --- ARMS ---
-    ctx.fillStyle = outfit === 'wedding' ? '#ffffff' :
+    const armColor = outfit === 'wedding' ? '#ffffff' :
                    (outfit === 'graduation' ? '#1e1e24' :
                    (outfit === 'mom_casual' ? '#b8c0ff' :
                    (outfit === 'engagement_dress' ? '#f5cac3' :
@@ -402,6 +402,7 @@ const Assets = {
     ctx.save();
     ctx.translate(-10, -42 + bounce * 0.3);
     ctx.rotate(-walkCycle * 0.3);
+    ctx.fillStyle = armColor;
     ctx.fillRect(-3, 0, 6, 18);
     // Hand
     ctx.fillStyle = '#ffd1ac';
@@ -410,22 +411,29 @@ const Assets = {
     ctx.fill();
     ctx.restore();
 
-    // Arm 2 (front)
+    // Arm 2 (front) — thrusts straight forward into a karate chop while shouting
     ctx.save();
     ctx.translate(10, -42 + bounce * 0.3);
-    ctx.rotate(walkCycle * 0.3);
-    ctx.fillStyle = outfit === 'wedding' ? '#ffffff' :
-                   (outfit === 'graduation' ? '#1e1e24' :
-                   (outfit === 'mom_casual' ? '#b8c0ff' :
-                   (outfit === 'engagement_dress' ? '#f5cac3' :
-                   (outfit === 'date_dress' ? '#e76f8a' :
-                   (outfit === 'sundress' ? '#ffd166' : '#fecfef')))));
-    ctx.fillRect(-3, 0, 6, 18);
-    // Hand
-    ctx.fillStyle = '#ffd1ac';
-    ctx.beginPath();
-    ctx.arc(0, 19, 4, 0, Math.PI * 2);
-    ctx.fill();
+    if (shout) {
+      ctx.rotate(-1.4); // swing the down-arm up to point forward
+      ctx.fillStyle = armColor;   // sleeve / upper arm
+      ctx.fillRect(-3, 0, 6, 12);
+      ctx.fillStyle = '#ffd1ac';  // skin forearm
+      ctx.fillRect(-3, 11, 6, 9);
+      // blocky fist with knuckle creases
+      ctx.fillRect(-4.5, 19, 9, 8);
+      ctx.fillStyle = 'rgba(180,120,90,0.3)';
+      ctx.fillRect(-4.5, 21.5, 9, 1);
+      ctx.fillRect(-4.5, 24, 9, 1);
+    } else {
+      ctx.rotate(walkCycle * 0.3);
+      ctx.fillStyle = armColor;
+      ctx.fillRect(-3, 0, 6, 18);
+      ctx.fillStyle = '#ffd1ac';
+      ctx.beginPath();
+      ctx.arc(0, 19, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
 
     // --- HEAD & FACE ---

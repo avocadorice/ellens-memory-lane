@@ -416,6 +416,10 @@ const Game = {
   // Game state
   isRunning: false,
   isPaused: false,
+  // Invincible by default on localhost/?dev, but the Dev Panel can turn it off
+  // and the choice is remembered across reloads (localStorage 'devGodMode').
+  godMode: DEV_MODE && (() => { try { return localStorage.getItem('devGodMode') !== 'off'; } catch (e) { return true; } })(), // toggle with G or the Dev Panel
+  player2Ai: false,  // dev: Barney mirrors Ellen's moves (toggle with B) to test 2P solo
   heartsCollected: 0,
   totalHearts: 0,
   currentLevelIndex: 0,
@@ -1403,6 +1407,15 @@ const Game = {
 
       // Dev: toggle 2-player co-op for desktop testing (P)
       if (DEV_MODE && code === 'KeyP') { if (!this.twoPlayer) this.enableTwoPlayer(); e.preventDefault(); }
+      // Dev: toggle invincibility (G)
+      if (DEV_MODE && code === 'KeyG') { this.setGodMode(!this.godMode); e.preventDefault(); }
+      // Dev: toggle Barney mirror-AI (B) — Barney shadows Ellen to test 2P solo
+      if (DEV_MODE && code === 'KeyB') {
+        this.player2Ai = !this.player2Ai;
+        if (this.player2Ai && !this.twoPlayer) this.enableTwoPlayer();
+        this._mirrorBuf = [];
+        e.preventDefault();
+      }
     });
 
     // Tagged controller events from the native Android bridge (slot-aware).
@@ -1548,15 +1561,11 @@ const Game = {
       this.canvas.focus();
     });
 
-    // Dev Panel: jump straight to the 100% secret-prize ending
-    document.getElementById('dev-win-btn').addEventListener('click', () => {
-      this.hearts.forEach(h => { h.collected = true; h.spawned = true; h.falling = false; });
-      this.totalHearts = this.hearts.length;
-      this.heartsCollected = this.totalHearts;
-      this.updateHeartsUI();
-      this.currentLevelIndex = this.levels.length - 1;
-      document.getElementById('dev-panel').classList.remove('active');
-      this.triggerGameComplete();
+    // Dev Panel: toggle god mode (invincibility); the choice persists across reloads
+    const devGodBtn = document.getElementById('dev-god-btn');
+    if (devGodBtn) devGodBtn.addEventListener('click', () => {
+      this.setGodMode(!this.godMode);
+      this.canvas.focus();
     });
 
     // Dev Panel: jump to the normal (< 100%) ending
@@ -1624,6 +1633,13 @@ const Game = {
     }
   },
 
+  // Dev: flip invincibility and remember the choice across reloads (localhost only).
+  setGodMode(on) {
+    this.godMode = !!on;
+    try { localStorage.setItem('devGodMode', this.godMode ? 'on' : 'off'); } catch (e) {}
+    this.updateDevPanel();
+  },
+
   updateDevPanel() {
     const devPanel = document.getElementById('dev-panel');
     if (!devPanel || !devPanel.classList.contains('active')) return;
@@ -1669,6 +1685,16 @@ const Game = {
     const posSpan = document.getElementById('dev-player-pos');
     if (posSpan) {
       posSpan.innerText = `X: ${Math.round(this.player.x)}, Y: ${Math.round(this.player.y)}`;
+    }
+
+    const godSpan = document.getElementById('dev-god-status');
+    if (godSpan) {
+      godSpan.innerText = this.godMode ? 'ON' : 'OFF';
+      godSpan.style.color = this.godMode ? '#52b788' : '#ff5400';
+    }
+    const godBtn = document.getElementById('dev-god-btn');
+    if (godBtn) {
+      godBtn.innerText = this.godMode ? 'God Mode: ON (click to disable)' : 'God Mode: OFF (click to enable)';
     }
   },
 
@@ -1716,6 +1742,8 @@ const Game = {
     this.player2.active = false;
     this.player2.isDead = false;
     this.player2.role = 'husband';
+    this.player2Ai = false;
+    this._mirrorBuf = [];
     this.skyQr = null;
 
     this.setupWorld();
@@ -1731,6 +1759,7 @@ const Game = {
         // Carry the pre-jump heading through the arc (see updatePhysics)
         this.airJumpDir = this.lastWalkDir || 0;
         AudioEngine.playJumpSFX();
+        this._ellenJumped = true; // for the dev mirror-AI
       }
     } else {
       if (this.player.isGrounded) {
@@ -1738,6 +1767,7 @@ const Game = {
         this.player.isGrounded = false;
         this.airJumpDir = this.lastWalkDir || 0;
         AudioEngine.playJumpSFX();
+        this._ellenJumped = true;
       }
     }
   },
@@ -1945,6 +1975,7 @@ const Game = {
     this.player.outfit = this.getEllenOutfit(lvlIdx);
 
     // --- PLAYER 2 (co-op) ---
+    if (this.player2Ai && this.player2.active) this.mirrorP2();
     if (this.player2.active) this.updateP2Physics(endX);
 
     // --- COMPANION TRAIL ENGINE ---
@@ -2062,8 +2093,8 @@ const Game = {
     b.health = b.maxHealth; b.isDead = false; b.invuln = 0;
     b.attackTimer = 0; b.reviveTimer = 0;
     b.yHistory = [];
-    this.p2Slot = null; // the next controller to send input becomes Player 2
-    this.skyQr = null;  // the pairing QR has done its job
+    this.p2Slot = null;     // the next controller to send input becomes Player 2
+    this._mirrorBuf = [];   // fresh buffer for the dev mirror-AI
     this.rescaleEnemiesForTwoPlayers();
   },
 
@@ -2142,6 +2173,30 @@ const Game = {
     b.vx = 0; b.vy = 0; b.isGrounded = true;
   },
 
+  // Dev mirror-AI: Barney replays Ellen's inputs a few frames behind, so the
+  // adjusted 2-player difficulty can be tested solo (localhost only).
+  mirrorP2() {
+    if (!this._mirrorBuf) this._mirrorBuf = [];
+    // Capture Ellen's input this frame.
+    this._mirrorBuf.unshift({
+      left: !!(this.keys['ArrowLeft'] || this.keys['KeyA']),
+      right: !!(this.keys['ArrowRight'] || this.keys['KeyD']),
+      jump: !!this._ellenJumped,
+      attack: !!this._ellenAttacked,
+    });
+    this._ellenJumped = false;
+    this._ellenAttacked = false;
+    if (this._mirrorBuf.length > 180) this._mirrorBuf.pop();
+    // Replay it onto Barney with a small delay.
+    const past = this._mirrorBuf[14]; // ~0.23s behind
+    if (past) {
+      this.keys2.left = past.left;
+      this.keys2.right = past.right;
+      if (past.jump) this.jumpBody(this.player2);
+      if (past.attack) this.attackP2();
+    }
+  },
+
   // Route a controller action to a player. pIdx 0 = Ellen, 1 = Barney/Preston.
   applyAction(pIdx, key, down) {
     // While the 2-player prompt is up, ANY controller navigates/confirms it.
@@ -2170,7 +2225,9 @@ const Game = {
         else this.attack();
       }
     } else {
-      this.maybePromoteCoop(); // desktop P2 keys also bring Barney into co-op
+      this.maybePromoteCoop(); // desktop P2 keys / phone bring Barney into co-op
+      // A real Player-2 controller hands control off from the dev mirror-AI.
+      if (this.player2Ai) { this.player2Ai = false; this.skyQr = null; }
       if (isLeft) this.keys2.left = down;
       else if (isRight) this.keys2.right = down;
       else if (isJump) this.jumpBody(this.player2);
@@ -2233,6 +2290,7 @@ const Game = {
   attack() {
     if (!this.isRunning || this.isPaused || this.player.isDead) return;
     if (this.player.attackTimer > 0) return;    // mid-swing/chop/kick
+    this._ellenAttacked = true; // for the dev mirror-AI
 
     // Soccer: once she's grabbed the soccer ball, the ranged attack becomes a
     // kicked soccer ball (in the gauntlet AND on into the boss fight).
@@ -2375,7 +2433,7 @@ const Game = {
       phase2: false, // flips at 50% HP → Storm Fury (fast + lightning)
       introT: 100 // brief grace before it starts attacking
     };
-    this.banner = { timer: 320, text: '⚡ The Storm Guardian blocks the path to Mt. Fuji — defeat it!' };
+    this.banner = { timer: 320, text: '⚡ The Storm Guardian blocks the path — defeat it!' };
     if (AudioEngine.userMusicOn) AudioEngine.switchBGM('boss');
   },
 
@@ -2529,7 +2587,7 @@ const Game = {
     AudioEngine.playWinSFX();
     // Back to the gentle nostalgic theme for the Fuji finale
     if (AudioEngine.userMusicOn) AudioEngine.switchBGM('normal');
-    this.banner = { timer: 360, text: '🌸 The Storm Guardian falls — the path to Mt. Fuji opens! 🗻' };
+    this.banner = { timer: 360, text: '🌸 The Storm Guardian falls — the path ahead opens! 🗻' };
   },
 
   // Nearest alive foe ahead of a returned projectile (for accurate whack-backs)
@@ -2551,6 +2609,7 @@ const Game = {
   // Damage either body. Ellen (P1) KO ends the game; Player 2 KO just sits out
   // and revives next to Ellen (co-op stays forgiving).
   damageBody(body) {
+    if (this.godMode) return; // dev invincibility
     if (!body || body.invuln > 0 || body.isDead) return;
     body.health -= 1;
     body.invuln = this.combat.invulnFrames;
@@ -3238,9 +3297,15 @@ const Game = {
   // A single HUD heart — filled red, or a hollow dark outline when empty. The
   // two states are rendered once into tiny offscreen canvases and then blitted,
   // so we don't re-tessellate bezier paths every frame.
-  drawHeartIcon(cx, cy, s, filled) {
+  drawHeartIcon(cx, cy, s, filled, color) {
+    color = color || 'red';
+    const palettes = {
+      red:  { fill: '#ff4d6d', stroke: '#b3173b' },
+      blue: { fill: '#4ea8de', stroke: '#1c5d8c' }, // Player 2 (Barney/Preston)
+    };
+    const pal = palettes[color] || palettes.red;
     if (!this._heartCache) this._heartCache = {};
-    const key = (filled ? 'f' : 'e') + s;
+    const key = (filled ? 'f' : 'e') + s + '_' + color;
     let cv = this._heartCache[key];
     if (!cv) {
       cv = document.createElement('canvas');
@@ -3256,8 +3321,8 @@ const Game = {
       c.bezierCurveTo(-k * 0.55, -k * 1.1, -k * 1.1, -k * 0.4, 0, k * 0.7);
       c.closePath();
       if (filled) {
-        c.fillStyle = '#ff4d6d'; c.fill();
-        c.lineWidth = 1.5; c.strokeStyle = '#b3173b'; c.stroke();
+        c.fillStyle = pal.fill; c.fill();
+        c.lineWidth = 1.5; c.strokeStyle = pal.stroke; c.stroke();
       } else {
         c.fillStyle = 'rgba(0,0,0,0.4)'; c.fill();
         c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,255,255,0.5)'; c.stroke();
@@ -3563,6 +3628,13 @@ const Game = {
     if (this.seatedBarney) this.seatedBarney.joined = true;
     this.armPlayer2Pairing();
     this.launchSkyQr();
+    // Dev/localhost: Barney auto-joins as an AI partner that mirrors Ellen, so the
+    // scaled 2-player difficulty can be tested solo. A real phone controller can
+    // still take over by scanning the QR and tapping (see applyAction).
+    if (DEV_MODE) {
+      this.player2Ai = true;
+      this.enableTwoPlayer();
+    }
   },
 
   armPlayer2Pairing() {
@@ -3641,6 +3713,7 @@ const Game = {
   // A phone controller connected — promote co-op so Barney becomes Player 2.
   onPlayer2Connected() {
     if (!this.twoPlayer) this.enableTwoPlayer();
+    this.skyQr = null; // they're pairing a phone now
   },
 
   showTwoPlayerPrompt() {
@@ -4386,7 +4459,7 @@ const Game = {
       if (attacking && !this.soccerActive()) {
         const prog = 1 - this.player.attackTimer / (this.player.attackMax || this.combat.swingDuration);
         if (isKarate) {
-          Assets.drawKarateChop(this.ctx, pX + this.player.dir * 12, this.player.y - 32, this.player.dir, prog);
+          Assets.drawKarateChop(this.ctx, pX + this.player.dir * 24, this.player.y - 24, this.player.dir, prog);
         } else if (this.player.weapon === 'racket') {
           Assets.drawSlash(this.ctx, pX + this.player.dir * 14, this.player.y - 30, this.player.dir, prog);
         }
@@ -4646,13 +4719,23 @@ const Game = {
       this.ctx.fillStyle = 'rgba(255,255,255,0.35)';
       this.ctx.fillRect(gx - 14, hRowY - 7, 2, 15);
       for (let i = 0; i < b.maxHealth; i++) {
-        this.drawHeartIcon(gx + i * heartGap, hRowY, heartSize, !b.isDead && i < b.health);
+        this.drawHeartIcon(gx + i * heartGap, hRowY, heartSize, !b.isDead && i < b.health, 'blue');
       }
       // name tag under Barney's hearts
       this.ctx.fillStyle = '#fff';
       this.ctx.font = '600 10px Outfit';
       this.ctx.textAlign = 'left';
-      this.ctx.fillText(b.isDead ? 'Reviving…' : (b.role === 'kid1' ? 'Preston' : 'Barney'), gx, hRowY + 15);
+      const p2name = b.isDead ? 'Reviving…' : (b.role === 'kid1' ? 'Preston' : 'Barney');
+      this.ctx.fillText(p2name + (this.player2Ai ? ' 🤖' : ''), gx, hRowY + 15);
+    }
+
+    // Dev invincibility indicator
+    if (DEV_MODE && this.godMode) {
+      this.ctx.fillStyle = '#ffd166';
+      this.ctx.font = '700 12px Outfit';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('🛡️ GOD MODE', this.width / 2, 20);
+      this.ctx.textAlign = 'left';
     }
 
     // --- Weapon badge --- (just below the heart row, top-left)
@@ -4691,7 +4774,7 @@ const Game = {
       this.ctx.fillStyle = '#fff';
       this.ctx.font = '700 13px Outfit';
       this.ctx.textAlign = 'center';
-      this.ctx.fillText('⚡ Storm Guardian of Mt. Fuji', this.width / 2, by - 8);
+      this.ctx.fillText('⚡ The Storm Guardian', this.width / 2, by - 8);
       this.ctx.fillStyle = 'rgba(255,255,255,0.18)';
       this.ctx.fillRect(bx, by, bw, bh);
       const frac = Math.max(0, this.boss.hp / this.boss.maxHp);
