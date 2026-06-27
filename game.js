@@ -559,6 +559,12 @@ const Game = {
     this.ctx = this.canvas.getContext('2d');
     this.canvas.focus();
     
+    // Detect touchscreens (iPhone/iPad + the iOS WebView wrapper) so Player 1's
+    // on-screen controls are shown and sized for fingers, not just narrow
+    // windows. iPadOS reports as a desktop "MacIntel" with touch points, so we
+    // also check maxTouchPoints rather than trusting the width media query alone.
+    this.detectTouch();
+
     // Scale for high-DPI screens
     this.resizeCanvas();
     this.updateOptimizationState();
@@ -587,6 +593,22 @@ const Game = {
       document.getElementById('loading-screen').classList.remove('active');
       document.getElementById('start-screen').classList.add('active');
     }, 1200);
+  },
+
+  // Flag touch-capable devices so styles.css can reveal Player 1's virtual
+  // D-pad. Covers phones, iPads (incl. desktop-class iPadOS Safari), and the
+  // iOS WebView wrapper. A first real touch confirms it even if feature
+  // detection was conservative.
+  detectTouch() {
+    const hasTouch = ('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0) ||
+      (navigator.msMaxTouchPoints > 0) ||
+      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    if (hasTouch) document.body.classList.add('touch-device');
+    window.addEventListener('touchstart', function onFirstTouch() {
+      document.body.classList.add('touch-device');
+      window.removeEventListener('touchstart', onFirstTouch);
+    }, { passive: true, once: true });
   },
 
   // In the shipped (non-dev) build, hide the Dev Panel, the chapter/memory
@@ -1577,44 +1599,57 @@ const Game = {
       this.triggerGameComplete();
     });
 
-    // Mobile buttons touch bindings
+    // Player 1 virtual controls (touchscreen). Pointer Events unify
+    // touch/mouse/pen and, with setPointerCapture, keep a button "held" even if
+    // the finger slides off it — so holding ◀ while tapping JUMP with a second
+    // finger works. pointercancel/lostpointercapture guarantee the key is
+    // released (e.g. iOS Control Center swipe or an interrupting call), so Ellen
+    // never gets stuck running. A contextmenu guard kills the long-press menu.
     const leftBtn = document.getElementById('btn-left');
     const rightBtn = document.getElementById('btn-right');
     const jumpBtn = document.getElementById('btn-jump');
 
-    const handleTouchStart = (btn, code) => {
-      btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
+    const bindHoldButton = (btn, code) => {
+      if (!btn) return;
+      const press = (e) => {
+        if (e) e.preventDefault();
+        if (this.keys[code]) return; // ignore extra pointers on the same button
         this.keys[code] = true;
+        btn.classList.add('pressed');
         if (code === 'KeyW') this.jump();
-      });
-      btn.addEventListener('touchend', (e) => {
-        e.preventDefault();
+      };
+      const release = (e) => {
+        if (e) e.preventDefault();
         this.keys[code] = false;
+        btn.classList.remove('pressed');
+      };
+      btn.addEventListener('pointerdown', (e) => {
+        try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+        press(e);
       });
-      // Fallback for mouse click debugging of mobile controls
-      btn.addEventListener('mousedown', () => {
-        this.keys[code] = true;
-        if (code === 'KeyW') this.jump();
-      });
-      btn.addEventListener('mouseup', () => {
-        this.keys[code] = false;
-      });
+      btn.addEventListener('pointerup', release);
+      btn.addEventListener('pointercancel', release);
+      btn.addEventListener('lostpointercapture', release);
+      btn.addEventListener('contextmenu', (e) => e.preventDefault());
     };
 
-    handleTouchStart(leftBtn, 'ArrowLeft');
-    handleTouchStart(rightBtn, 'ArrowRight');
-    handleTouchStart(jumpBtn, 'KeyW');
+    bindHoldButton(leftBtn, 'ArrowLeft');
+    bindHoldButton(rightBtn, 'ArrowRight');
+    bindHoldButton(jumpBtn, 'KeyW');
 
-    // Mobile attack button
+    // Attack: a momentary tap (no held state to release).
     const attackBtn = document.getElementById('btn-attack');
     if (attackBtn) {
-      const doAttack = (e) => {
-        if (e) e.preventDefault();
+      attackBtn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        attackBtn.classList.add('pressed');
         if (this.isRunning && !this.isPaused) this.attack();
-      };
-      attackBtn.addEventListener('touchstart', doAttack);
-      attackBtn.addEventListener('mousedown', doAttack);
+      });
+      const clearAttack = () => attackBtn.classList.remove('pressed');
+      attackBtn.addEventListener('pointerup', clearAttack);
+      attackBtn.addEventListener('pointercancel', clearAttack);
+      attackBtn.addEventListener('pointerleave', clearAttack);
+      attackBtn.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
     // Game Over: Try Again button
