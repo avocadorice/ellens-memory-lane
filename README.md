@@ -33,6 +33,19 @@ A beautiful, interactive, and personalized 2D HTML5 Canvas side-scrolling game b
 * `physics.wasm` - Compiled WebAssembly binary loaded dynamically by the game.
 * `assets.js` - Procedural 2D path rendering canvas assets for all character animations, background houses, camper, and Mt. Fuji scenery.
 * `levels.js` - Configuration of coordinates, years, sky gradient colors, dialogues, and trivia questions.
+* `android/` - Native Google TV wrapper app (WebView) — see [`android/README.md`](android/README.md).
+* `ios/` - Native iOS / iPadOS wrapper app (WKWebView) with touchscreen Player 1 controls — see [`ios/README.md`](ios/README.md).
+
+---
+
+## 📱 Playing on a phone, tablet, or iOS
+
+On any touchscreen, Player 1 gets on-screen controls — ◀ ▶ to move, **JUMP**, and
+⚔️ to chop — placed clear of the notch and home indicator. They're built for
+fingers: each button captures its own touch, so you can hold a direction and tap
+JUMP at the same time, and a press is always released even if iOS interrupts
+with Control Center or a call. Just open the site in mobile Safari/Chrome, or
+build the native [`ios/`](ios/README.md) app for a home-screen icon.
 
 ---
 
